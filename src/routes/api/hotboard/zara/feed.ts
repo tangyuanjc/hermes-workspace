@@ -26,6 +26,7 @@ export async function handleHotboardZaraFeedGet(request: Request): Promise<Respo
 
   const store = createZaraStore()
   return json({
+    last_refreshed_at: store.getLastRefreshedAt(),
     items: store.listAllItems(parsedLimit.data),
   })
 }

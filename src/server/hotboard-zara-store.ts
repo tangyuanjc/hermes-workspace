@@ -174,4 +174,13 @@ export class ZaraStore {
 
     return (stmt.all(normalizeLimit(limit)) as ZaraYoutubeRow[]).map(mapRowToItem)
   }
+
+  getLastRefreshedAt(): string | null {
+    const stmt = this.db.prepare(`
+      SELECT MAX(last_refreshed_at) AS last_refreshed_at
+      FROM zara_youtube_items
+    `)
+    const row = stmt.get() as { last_refreshed_at: string | null } | undefined
+    return row?.last_refreshed_at ?? null
+  }
 }

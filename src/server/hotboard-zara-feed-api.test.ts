@@ -92,6 +92,7 @@ describe('hotboard zara feed api handler', () => {
     expect(response.status).toBe(200)
 
     const payload = (await response.json()) as {
+      last_refreshed_at: string | null
       items: Array<{ videoId: string; title: string }>
     }
 
@@ -100,6 +101,7 @@ describe('hotboard zara feed api handler', () => {
       videoId: 'ysPbXH0LpIE',
       title: 'Prompting 101 | Code w/ Claude',
     })
+    expect(payload.last_refreshed_at).toBeTypeOf('string')
   })
 
   it('rejects unauthenticated requests', async () => {

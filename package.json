@@ -7,10 +7,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev --port 3000",
+    "dev": "node scripts/dev-with-hotboard-bootstrap.mjs",
     "build": "vite build",
     "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node .output/server/index.mjs",
-    "start:dev": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite dev --port 3000",
+    "start:dev": "node scripts/dev-with-hotboard-bootstrap.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint",
