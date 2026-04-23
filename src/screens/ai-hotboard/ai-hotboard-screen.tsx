@@ -1,5 +1,15 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ActivitySparkIcon,
+  AiSearchIcon,
+  AnalyticsUpIcon,
+  ArrowRight01Icon,
+  ArrowUp01Icon,
+  Bookmark02Icon,
+  LinkSquareIcon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { cn } from '@/lib/utils'
 import { fetchHermesAuthStatus, type AuthUser } from '@/lib/hermes-auth'
@@ -217,10 +227,57 @@ const TAG_SIGNAL_BUCKET_MAP: Record<string, keyof typeof CATEGORY_WEIGHT_MAP> = 
 
 const ACTION_PREFIXES = ['触发 skill', '派 agent', '更新战略'] as const
 
-export const SIGNAL_BADGE_CLASS =
-  'inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#2a2f3e] text-[12px] font-semibold leading-none text-white'
+const EDITORIAL_DISPLAY_STYLE = {
+  fontFamily: '"EB Garamond", "Times New Roman", Georgia, serif',
+} satisfies CSSProperties
 
-export const RECOMMEND_BANNER_CLASS = 'rounded-xl bg-emerald-950/70 px-3 py-2 text-sm leading-6 text-emerald-200'
+const EDITORIAL_MONO_STYLE = {
+  fontFamily: '"JetBrains Mono", "SFMono-Regular", ui-monospace, monospace',
+} satisfies CSSProperties
+
+const HOTBOARD_BACKGROUND_STYLE = {
+  backgroundImage:
+    'radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 24%), radial-gradient(circle at top right, rgba(251, 191, 36, 0.12), transparent 22%), linear-gradient(180deg, rgba(2, 6, 23, 1) 0%, rgba(3, 7, 18, 1) 36%, rgba(2, 6, 23, 1) 100%)',
+} satisfies CSSProperties
+
+const HOTBOARD_SIDEBAR_STYLE = {
+  backgroundImage:
+    'radial-gradient(circle at top, rgba(103, 232, 249, 0.11), transparent 28%), linear-gradient(180deg, rgba(2, 6, 23, 0.97) 0%, rgba(2, 6, 23, 0.93) 100%)',
+} satisfies CSSProperties
+
+const HOTBOARD_PANEL_STYLE = {
+  backgroundImage:
+    'radial-gradient(circle at top left, rgba(103, 232, 249, 0.10), transparent 34%), radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.06), transparent 28%), linear-gradient(180deg, rgba(15, 23, 42, 0.92) 0%, rgba(2, 6, 23, 0.9) 100%)',
+} satisfies CSSProperties
+
+const HOTBOARD_CARD_STYLE = {
+  backgroundImage:
+    'radial-gradient(circle at top left, rgba(103, 232, 249, 0.08), transparent 32%), radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.05), transparent 26%), linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.86) 100%)',
+} satisfies CSSProperties
+
+const HOTBOARD_PANEL_CLASS =
+  'relative overflow-hidden border border-white/10 shadow-[0_24px_72px_rgba(2,6,23,0.52),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl'
+
+const HOTBOARD_CARD_CLASS =
+  'group relative overflow-hidden rounded-[28px] border border-white/10 shadow-[0_20px_56px_rgba(2,6,23,0.46),inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/28 hover:shadow-[0_32px_72px_rgba(2,6,23,0.58),0_0_0_1px_rgba(103,232,249,0.10)]'
+
+const HOTBOARD_SECTION_CLASS = `${HOTBOARD_CARD_CLASS} px-5 py-5`
+const HOTBOARD_COMPACT_PANEL_CLASS = `${HOTBOARD_CARD_CLASS} px-4 py-4`
+
+const HOTBOARD_FIELD_CLASS =
+  'w-full rounded-[18px] border border-white/12 bg-slate-950/75 px-4 py-3 text-sm text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] outline-none transition-all placeholder:text-slate-500 focus:border-cyan-300/65 focus:bg-slate-950/90 focus:shadow-[0_0_0_1px_rgba(103,232,249,0.18)]'
+
+const HOTBOARD_PRIMARY_BUTTON_CLASS =
+  'inline-flex items-center justify-center gap-2 rounded-[18px] border border-amber-300/35 bg-amber-300/16 px-4 py-2.5 text-sm font-medium text-amber-50 shadow-[0_18px_40px_rgba(120,53,15,0.2)] transition-all duration-200 hover:-translate-y-px hover:border-amber-200/60 hover:bg-amber-300/22 disabled:cursor-not-allowed disabled:opacity-60'
+
+const HOTBOARD_SECONDARY_BUTTON_CLASS =
+  'rounded-[14px] border border-white/12 bg-slate-950/55 px-3 py-1.5 text-xs text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all hover:border-cyan-300/35 hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
+
+export const SIGNAL_BADGE_CLASS =
+  'inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#2a2f3e] text-[12px] font-semibold leading-none text-white shadow-[0_8px_18px_rgba(15,23,42,0.38)]'
+
+export const RECOMMEND_BANNER_CLASS =
+  'rounded-xl border border-emerald-400/15 bg-emerald-950/70 px-3 py-2 text-sm leading-6 text-emerald-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
 
 function computeSignalScore(event: MockEvent) {
   const tagBuckets = event.tags.map((tag) => TAG_SIGNAL_BUCKET_MAP[tag] ?? '纯新闻')
@@ -431,6 +488,117 @@ export function buildFeedStats(
   }
 }
 
+type HotboardStatCardTone = 'cyan' | 'amber' | 'emerald'
+
+function HotboardStatCard({
+  label,
+  value,
+  icon,
+  helper,
+  trendLabel,
+  tone,
+}: {
+  label: string
+  value: number
+  icon: typeof ActivitySparkIcon
+  helper: string
+  trendLabel: string
+  tone: HotboardStatCardTone
+}) {
+  const toneStyles = {
+    cyan: {
+      chip: 'border-cyan-300/25 bg-cyan-300/12 text-cyan-100 shadow-[0_16px_32px_rgba(8,145,178,0.18)]',
+      badge: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100',
+    },
+    amber: {
+      chip: 'border-amber-300/25 bg-amber-300/12 text-amber-100 shadow-[0_16px_32px_rgba(120,53,15,0.18)]',
+      badge: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
+    },
+    emerald: {
+      chip: 'border-emerald-300/25 bg-emerald-300/12 text-emerald-100 shadow-[0_16px_32px_rgba(4,120,87,0.18)]',
+      badge: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
+    },
+  }[tone]
+
+  return (
+    <article className={cn(HOTBOARD_CARD_CLASS, 'min-h-[152px] px-4 py-4 sm:px-5')} style={HOTBOARD_CARD_STYLE}>
+      <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-60" />
+      <div className="flex h-full items-start justify-between gap-4">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                'inline-flex h-11 w-11 items-center justify-center rounded-[18px] border animate-pulse [animation-duration:6s]',
+                toneStyles.chip,
+              )}
+            >
+              <HugeiconsIcon icon={icon} size={22} strokeWidth={1.6} />
+            </span>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] tracking-[0.2em]',
+                toneStyles.badge,
+              )}
+              style={EDITORIAL_MONO_STYLE}
+            >
+              <HugeiconsIcon icon={ArrowUp01Icon} size={12} strokeWidth={1.8} />
+              {trendLabel}
+            </span>
+          </div>
+
+          <div>
+            <div className="text-[11px] tracking-[0.26em] text-slate-500" style={EDITORIAL_MONO_STYLE}>
+              {label}
+            </div>
+            <div className="mt-3 text-[2.35rem] leading-none text-white sm:text-[2.8rem]" style={EDITORIAL_DISPLAY_STYLE}>
+              {value.toLocaleString('en-US')}
+            </div>
+          </div>
+        </div>
+
+        <p className="hidden max-w-[9.5rem] text-right text-[11px] leading-5 text-slate-500 lg:block">
+          {helper}
+        </p>
+      </div>
+    </article>
+  )
+}
+
+function FriendlyEmptyState({
+  icon,
+  title,
+  description,
+  ctaLabel,
+  ctaTo,
+}: {
+  icon: typeof AiSearchIcon
+  title: string
+  description: string
+  ctaLabel: string
+  ctaTo: string
+}) {
+  return (
+    <section className={cn(HOTBOARD_CARD_CLASS, 'px-6 py-8 text-center sm:px-8')} style={HOTBOARD_CARD_STYLE}>
+      <div className="mx-auto flex max-w-xl flex-col items-center">
+        <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_18px_40px_rgba(8,145,178,0.18)]">
+          <HugeiconsIcon icon={icon} size={26} strokeWidth={1.6} />
+        </span>
+        <div className="mt-5 text-[11px] tracking-[0.28em] text-slate-500" style={EDITORIAL_MONO_STYLE}>
+          QUEUE EMPTY
+        </div>
+        <h3 className="mt-3 text-[2rem] leading-none text-white sm:text-[2.3rem]" style={EDITORIAL_DISPLAY_STYLE}>
+          {title}
+        </h3>
+        <p className="mt-3 text-sm leading-7 text-slate-300 sm:text-[15px]">{description}</p>
+        <Link to={ctaTo} className={cn(HOTBOARD_PRIMARY_BUTTON_CLASS, 'mt-6 px-5')}>
+          {ctaLabel}
+          <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
+        </Link>
+      </div>
+    </section>
+  )
+}
+
 function feedMatchesMode(
   event: TimelineEvent,
   mode: FeedMode,
@@ -468,14 +636,14 @@ function LinkNavItems({
             <Link
               to={item.to}
               activeOptions={exactHighlights ? { exact: true } : undefined}
-              className="block rounded-xl focus-visible:outline-none"
+              className="block rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50"
             >
               <div
                 className={cn(
-                  'rounded-xl border px-3 py-2 text-sm transition-colors',
+                  'rounded-[18px] border px-3 py-2 text-sm transition-all duration-200',
                   highlighted
-                    ? 'border-cyan-400/45 bg-cyan-400/15 font-medium text-cyan-100'
-                    : 'border-slate-700/70 bg-slate-900/50 text-slate-300 hover:border-slate-500/80 hover:text-slate-100',
+                    ? 'border-cyan-300/55 bg-cyan-300/16 font-medium text-cyan-50 shadow-[0_18px_36px_rgba(8,145,178,0.18),inset_0_1px_0_rgba(255,255,255,0.06)]'
+                    : 'border-white/10 bg-slate-950/50 text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:-translate-y-px hover:border-slate-400/40 hover:bg-slate-900/78 hover:text-slate-50',
                 )}
               >
                 {item.label}
@@ -503,7 +671,9 @@ function SidebarSectionLinkGroup({
     <section className="space-y-1.5" aria-label={`${title}导航`} data-testid={testId}>
       <ul className="space-y-1.5">
         <li className="list-none" data-nav-item={title}>
-          <div className="rounded-xl border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-200">{title}</div>
+          <div className="rounded-[18px] border border-white/10 bg-slate-950/55 px-3 py-2 text-sm font-medium text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            {title}
+          </div>
         </li>
       </ul>
       <div className="pl-2">
@@ -538,7 +708,9 @@ function SourceRouteItems({
   return (
     <ul className="space-y-1.5">
       <li className="list-none" data-nav-item="信源">
-        <div className="rounded-xl border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-200">信源</div>
+        <div className="rounded-[18px] border border-white/10 bg-slate-950/55 px-3 py-2 text-sm font-medium text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          信源
+        </div>
       </li>
       <li className="list-none">
         <div className="pl-2 space-y-1.5">
@@ -602,9 +774,9 @@ function V2PlaceholderPanel({
   dataSource: string
 }) {
   return (
-    <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80">PLACEHOLDER</div>
-      <h2 className="mt-2 text-2xl font-semibold text-slate-100">{title}</h2>
+    <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>PLACEHOLDER</div>
+      <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>{title}</h2>
       <div className="mt-3 rounded-2xl border border-cyan-400/35 bg-cyan-400/10 px-4 py-3 text-lg font-medium text-cyan-100">
         v2 milestone 接入中 · 预计 {expectedWeek} 上线
       </div>
@@ -630,9 +802,9 @@ function StrategyPanel({
   const label = STRATEGY_ROUTE_ITEMS.find((route) => route.key === strategyLine)?.label ?? strategyLine
 
   return (
-    <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80">M2 STRATEGY</div>
-      <h2 className="mt-2 text-2xl font-semibold text-slate-100">{label}</h2>
+    <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>M2 STRATEGY</div>
+      <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>{label}</h2>
 
       {loading ? (
         <div className="mt-4 rounded-xl border border-slate-700/70 bg-slate-950/45 px-4 py-3 text-sm text-slate-300">正在读取主线状态...</div>
@@ -700,9 +872,9 @@ function IntakePanel({
     null
 
   return (
-    <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80">INTAKE</div>
-      <h2 className="mt-2 text-2xl font-semibold text-slate-100">{title}</h2>
+    <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>INTAKE</div>
+      <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>{title}</h2>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <div className="space-y-3">
@@ -724,10 +896,10 @@ function IntakePanel({
                       type="button"
                       onClick={() => onSelectItem(item.id)}
                       className={cn(
-                        'w-full rounded-xl border px-3 py-2 text-left transition-colors',
+                        'w-full rounded-[18px] border px-3 py-2 text-left transition-all duration-200',
                         selected
-                          ? 'border-cyan-400/45 bg-cyan-400/15 text-cyan-100'
-                          : 'border-slate-700/70 bg-slate-900/45 text-slate-300 hover:border-slate-500/80 hover:text-slate-100',
+                          ? 'border-cyan-300/50 bg-cyan-300/14 text-cyan-100 shadow-[0_18px_36px_rgba(8,145,178,0.16),inset_0_1px_0_rgba(255,255,255,0.04)]'
+                          : 'border-white/10 bg-slate-950/55 text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] hover:-translate-y-px hover:border-slate-400/40 hover:text-slate-100',
                       )}
                     >
                       <div className="text-sm font-medium">{item.title}</div>
@@ -742,10 +914,10 @@ function IntakePanel({
 
         <div className="space-y-3">
           {selectedItem ? (
-            <article className="rounded-xl border border-slate-700/70 bg-slate-950/45 px-4 py-4">
-              <h3 className="text-lg font-semibold text-slate-100">{selectedItem.title}</h3>
+            <article className="rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <h3 className="text-[1.7rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>{selectedItem.title}</h3>
               <div className="mt-1 text-xs text-slate-400">{formatEntryTime(selectedItem.created_at)} · {selectedItem.submitted_by_name}</div>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-200">{selectedItem.body}</p>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-200">{selectedItem.body}</p>
               {selectedItem.tags.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {selectedItem.tags.map((tag) => (
@@ -756,7 +928,7 @@ function IntakePanel({
             </article>
           ) : null}
 
-          <div className="rounded-xl border border-slate-700/70 bg-slate-950/45 px-4 py-4">
+          <div className="rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
             <div className="text-sm font-medium text-slate-100">新增提报</div>
             {!canWrite ? (
               <div className="mt-2 rounded-md border border-slate-700/70 bg-slate-900/70 px-3 py-2 text-sm text-slate-300">当前账号为员工只读身份，写入入口仅对 agent 开放。</div>
@@ -767,21 +939,21 @@ function IntakePanel({
                   value={draft.title}
                   onChange={(event) => onDraftChange({ title: event.target.value })}
                   placeholder="标题"
-                  className="w-full rounded-lg border border-slate-600/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-300/70"
+                  className={HOTBOARD_FIELD_CLASS}
                 />
                 <textarea
                   value={draft.body}
                   onChange={(event) => onDraftChange({ body: event.target.value })}
                   placeholder="正文"
                   rows={5}
-                  className="w-full rounded-lg border border-slate-600/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-300/70"
+                  className={cn(HOTBOARD_FIELD_CLASS, 'min-h-[7.5rem] resize-y')}
                 />
                 <input
                   type="text"
                   value={draft.tagsText}
                   onChange={(event) => onDraftChange({ tagsText: event.target.value })}
                   placeholder="tags，逗号分隔"
-                  className="w-full rounded-lg border border-slate-600/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-300/70"
+                  className={HOTBOARD_FIELD_CLASS}
                 />
                 {requestError ? (
                   <div className="rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{requestError}</div>
@@ -790,7 +962,7 @@ function IntakePanel({
                   type="button"
                   onClick={onSubmit}
                   disabled={submitting}
-                  className="rounded-lg border border-cyan-300/55 bg-cyan-300/20 px-3 py-1.5 text-sm text-cyan-100 transition-colors hover:border-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={HOTBOARD_PRIMARY_BUTTON_CLASS}
                 >
                   {submitting ? '提交中...' : '提交提报'}
                 </button>
@@ -805,12 +977,14 @@ function IntakePanel({
 
 function IterationPanel() {
   return (
-    <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]" data-testid="strategy-iteration-section">
-      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80">ITERATION</div>
-      <h2 className="mt-2 text-2xl font-semibold text-slate-100">策略迭代</h2>
+    <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE} data-testid="strategy-iteration-section">
+      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>ITERATION</div>
+      <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>策略迭代</h2>
       <ul className="mt-4 space-y-2">
         {STRATEGY_ITERATION_ITEMS.map((item) => (
-          <li key={item} className="rounded-xl border border-slate-700/70 bg-slate-950/45 px-4 py-3 text-sm text-slate-200">{item}</li>
+          <li key={item} className="rounded-[18px] border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            {item}
+          </li>
         ))}
       </ul>
     </section>
@@ -834,30 +1008,64 @@ function WechatIngestPanel({
 }) {
   if (authUser?.role !== 'owner') {
     return (
-      <section className="rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4">
-        <div className="text-sm text-slate-300">当前账号为只读身份，公众号 URL 投递仅 owner 可用。</div>
+      <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-slate-950/55 text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <HugeiconsIcon icon={LinkSquareIcon} size={22} strokeWidth={1.6} />
+          </span>
+          <div>
+            <div className="text-[11px] tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>OWNER DROP</div>
+            <div className="mt-2 text-base text-slate-100">当前账号为只读身份，公众号 URL 投递仅 owner 可用。</div>
+          </div>
+        </div>
       </section>
     )
   }
 
   return (
-    <section className="rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4">
-      <div className="text-sm font-medium text-slate-100">粘贴微信公众号文章 URL</div>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <input
-          type="url"
-          value={draftUrl}
-          onChange={(event) => onDraftUrlChange(event.target.value)}
-          placeholder="https://mp.weixin.qq.com/s/..."
-          className="min-w-0 flex-1 rounded-lg border border-slate-600/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-300/70"
-        />
+    <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 shadow-[0_16px_30px_rgba(8,145,178,0.18)] animate-pulse [animation-duration:6s]">
+              <HugeiconsIcon icon={LinkSquareIcon} size={22} strokeWidth={1.6} />
+            </span>
+            <div>
+              <div className="text-[11px] tracking-[0.28em] text-slate-500" style={EDITORIAL_MONO_STYLE}>OWNER DROP</div>
+              <div className="mt-1 text-lg text-slate-100">粘贴微信公众号文章 URL</div>
+            </div>
+          </div>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+            像给 agent 投递指令一样，把公众号链接扔进来。系统会抓取正文、落库，再回流到热板时间线。
+          </p>
+        </div>
+
+        <div className="rounded-full border border-white/10 bg-slate-950/55 px-3 py-1 text-[11px] tracking-[0.2em] text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]" style={EDITORIAL_MONO_STYLE}>
+          {'MP > INGEST > SCORE'}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 xl:flex-row">
+        <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[22px] border border-white/10 bg-slate-950/60 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <span className="rounded-full border border-white/10 bg-slate-900/80 px-2.5 py-1 text-[11px] text-cyan-100" style={EDITORIAL_MONO_STYLE}>
+            DROP URL
+          </span>
+          <input
+            type="url"
+            value={draftUrl}
+            onChange={(event) => onDraftUrlChange(event.target.value)}
+            placeholder="https://mp.weixin.qq.com/s/..."
+            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
+          />
+        </div>
         <button
           type="button"
           onClick={onSubmit}
           disabled={submitting}
-          className="rounded-lg border border-cyan-300/55 bg-cyan-300/20 px-3 py-2 text-sm text-cyan-100 transition-colors hover:border-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          className={cn(HOTBOARD_PRIMARY_BUTTON_CLASS, 'min-w-[8.5rem]')}
         >
           {submitting ? '抓取中...' : '抓取文章'}
+          <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
         </button>
       </div>
       {requestError ? (
@@ -880,24 +1088,41 @@ function ZaraRefreshPanel({
 }) {
   if (authUser?.role !== 'owner') {
     return (
-      <section className="rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4">
-        <div className="text-sm text-slate-300">当前账号为只读身份，Zara 源刷新仅 owner 可用。</div>
+      <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-slate-950/55 text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <HugeiconsIcon icon={ActivitySparkIcon} size={22} strokeWidth={1.6} />
+          </span>
+          <div>
+            <div className="text-[11px] tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>REFRESH LOCKED</div>
+            <div className="mt-2 text-base text-slate-100">当前账号为只读身份，Zara 源刷新仅 owner 可用。</div>
+          </div>
+        </div>
       </section>
     )
   }
 
   return (
-    <section className="rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4">
-      <div className="text-sm font-medium text-slate-100">Zara YouTube 精选刷新</div>
-      <div className="mt-2 text-sm text-slate-300">通过 Playwright 抓取 Zara 学习库里的 YouTube 精选区，并同步到本地 SQLite。</div>
+    <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-[11px] tracking-[0.28em] text-slate-500" style={EDITORIAL_MONO_STYLE}>CURATED REFRESH</div>
+          <div className="mt-2 text-lg text-slate-100">Zara YouTube 精选刷新</div>
+          <div className="mt-2 text-sm leading-7 text-slate-300">通过 Playwright 抓取 Zara 学习库里的 YouTube 精选区，并同步到本地 SQLite。</div>
+        </div>
+        <div className="rounded-full border border-white/10 bg-slate-950/55 px-3 py-1 text-[11px] tracking-[0.2em] text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]" style={EDITORIAL_MONO_STYLE}>
+          {'YT > CURATE > SQLITE'}
+        </div>
+      </div>
       <div className="mt-3">
         <button
           type="button"
           onClick={onRefresh}
           disabled={refreshing}
-          className="rounded-lg border border-cyan-300/55 bg-cyan-300/20 px-3 py-2 text-sm text-cyan-100 transition-colors hover:border-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          className={HOTBOARD_PRIMARY_BUTTON_CLASS}
         >
           {refreshing ? '刷新中...' : '刷新 Zara 源'}
+          <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
         </button>
       </div>
       {requestError ? (
@@ -910,9 +1135,13 @@ function ZaraRefreshPanel({
 function ZaraYoutubeTimeline({ items }: { items: ZaraYoutubeSummary[] }) {
   if (items.length === 0) {
     return (
-      <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-        <div className="text-sm text-slate-300">当前 Zara YouTube 精选还没有数据。</div>
-      </section>
+      <FriendlyEmptyState
+        icon={AiSearchIcon}
+        title="Zara 精选暂时还没到站"
+        description="当前源还没有抓到可展示的精选条目。可以先回到主看板看全局热点，或用上面的刷新入口再拉一轮。"
+        ctaLabel="返回 AI 热点看板"
+        ctaTo="/ai-hotboard"
+      />
     )
   }
 
@@ -921,7 +1150,8 @@ function ZaraYoutubeTimeline({ items }: { items: ZaraYoutubeSummary[] }) {
       {items.map((item) => (
         <article
           key={item.videoId}
-          className="overflow-hidden rounded-3xl border border-slate-700/65 bg-slate-900/70 shadow-[0_16px_36px_rgba(2,6,23,0.45)]"
+          className={cn(HOTBOARD_CARD_CLASS, 'overflow-hidden')}
+          style={HOTBOARD_CARD_STYLE}
         >
           <a href={item.url} target="_blank" rel="noreferrer" className="block">
             {item.thumbnailUrl ? (
@@ -940,7 +1170,8 @@ function ZaraYoutubeTimeline({ items }: { items: ZaraYoutubeSummary[] }) {
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-lg font-semibold leading-7 text-slate-100 transition-colors hover:text-cyan-200"
+                className="text-[1.7rem] leading-[1.15] text-slate-100 transition-colors hover:text-cyan-200"
+                style={EDITORIAL_DISPLAY_STYLE}
               >
                 {item.title}
               </a>
@@ -977,9 +1208,9 @@ function BasicPagePanel({
 }) {
   if (page === 'system') {
     return (
-      <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-        <div className="text-[11px] tracking-[0.26em] text-cyan-300/80">SYSTEM</div>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-100">系统</h2>
+      <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+        <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>SYSTEM</div>
+        <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>系统</h2>
         <p className="mt-3 text-sm leading-6 text-slate-300">系统页已接入，用于后续放置环境配置、任务开关与数据回补入口。</p>
       </section>
     )
@@ -987,24 +1218,24 @@ function BasicPagePanel({
 
   if (page === 'user') {
     return (
-      <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-        <div className="text-[11px] tracking-[0.26em] text-cyan-300/80">USER</div>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-100">用户</h2>
+      <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+        <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>USER</div>
+        <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>用户</h2>
         <p className="mt-3 text-sm leading-6 text-slate-300">用户页已接入，后续可扩展我的收藏统计与个人偏好设置。</p>
       </section>
     )
   }
 
   return (
-    <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80">LOGOUT</div>
-      <h2 className="mt-2 text-2xl font-semibold text-slate-100">退出</h2>
+    <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>LOGOUT</div>
+      <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>退出</h2>
       <p className="mt-3 text-sm leading-6 text-slate-300">将结束当前登录会话并返回 ai-hotboard 入口。</p>
       <button
         type="button"
         onClick={onLogout}
         disabled={isLoggingOut}
-        className="mt-4 rounded-lg border border-slate-500/70 px-3 py-1.5 text-sm text-slate-100 transition-colors hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+        className={cn(HOTBOARD_SECONDARY_BUTTON_CLASS, 'mt-4 px-3 py-2 text-sm text-slate-100 hover:border-slate-300')}
       >
         {isLoggingOut ? '退出中...' : '确认退出'}
       </button>
@@ -1023,9 +1254,13 @@ function FeedTimeline({
 }) {
   if (timelineGroups.length === 0) {
     return (
-      <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
-        <div className="text-sm text-slate-300">当前视图暂无数据。</div>
-      </section>
+      <FriendlyEmptyState
+        icon={AiSearchIcon}
+        title="当前视图还没有信号"
+        description="这个筛选条件下暂时没有新条目。你可以先去全部 AI 动态看全量时间线，再回来做更窄的筛选。"
+        ctaLabel="查看全部 AI 动态"
+        ctaTo="/ai-hotboard/view/all"
+      />
     )
   }
 
@@ -1039,7 +1274,9 @@ function FeedTimeline({
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                 <span className="mt-1 w-px flex-1 bg-gradient-to-b from-emerald-400/70 to-transparent" />
               </div>
-              <div className="text-[36px] font-extrabold leading-none tracking-[-0.03em] text-slate-100">{group.timestamp}</div>
+              <div className="text-[38px] leading-none tracking-[-0.04em] text-slate-100 sm:text-[44px]" style={EDITORIAL_DISPLAY_STYLE}>
+                {group.timestamp}
+              </div>
             </div>
           </div>
 
@@ -1049,18 +1286,21 @@ function FeedTimeline({
               return (
                 <article
                   key={event.id}
-                  className="rounded-3xl border border-slate-700/65 bg-slate-900/70 px-4 py-4 shadow-[0_16px_36px_rgba(2,6,23,0.45)]"
+                  className={cn(HOTBOARD_CARD_CLASS, 'px-4 py-4 sm:px-5 sm:py-5')}
+                  style={HOTBOARD_CARD_STYLE}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400" style={EDITORIAL_MONO_STYLE}>
                         <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
                         <span className="truncate">{event.condensedSourceLabel}</span>
                       </div>
 
-                      <h2 className="text-xl font-bold leading-7 text-slate-100">{event.title}</h2>
+                      <h2 className="text-[1.9rem] leading-[1.08] text-slate-100 sm:text-[2.15rem]" style={EDITORIAL_DISPLAY_STYLE}>
+                        {event.title}
+                      </h2>
 
-                      <p className="text-[15px] leading-7 text-slate-300">{event.summary}</p>
+                      <p className="text-[15px] leading-8 text-slate-200/92">{event.summary}</p>
                     </div>
 
                     <div className="flex shrink-0 items-start gap-2 pl-2">
@@ -1072,10 +1312,10 @@ function FeedTimeline({
                           type="button"
                           onClick={() => handleVoteClick(event.id, 'like', voteState)}
                           className={cn(
-                            'cursor-pointer rounded-full border px-2 py-1 transition-colors',
+                            'cursor-pointer rounded-full border px-2 py-1 transition-all duration-200',
                             voteState.my_vote.includes('like')
                               ? 'border-emerald-300/70 bg-emerald-300/25 text-emerald-100'
-                              : 'border-slate-700/70 bg-slate-900/50 text-slate-400 hover:border-slate-500/80 hover:text-slate-200',
+                              : 'border-white/10 bg-slate-950/55 text-slate-400 hover:border-slate-400/40 hover:text-slate-200',
                           )}
                           aria-pressed={voteState.my_vote.includes('like')}
                           aria-label={`点赞 ${event.title}`}
@@ -1086,10 +1326,10 @@ function FeedTimeline({
                           type="button"
                           onClick={() => handleVoteClick(event.id, 'dislike', voteState)}
                           className={cn(
-                            'cursor-pointer rounded-full border px-2 py-1 transition-colors',
+                            'cursor-pointer rounded-full border px-2 py-1 transition-all duration-200',
                             voteState.my_vote.includes('dislike')
                               ? 'border-rose-300/70 bg-rose-300/25 text-rose-100'
-                              : 'border-slate-700/70 bg-slate-900/50 text-slate-400 hover:border-slate-500/80 hover:text-slate-200',
+                              : 'border-white/10 bg-slate-950/55 text-slate-400 hover:border-slate-400/40 hover:text-slate-200',
                           )}
                           aria-pressed={voteState.my_vote.includes('dislike')}
                           aria-label={`点踩 ${event.title}`}
@@ -1100,10 +1340,10 @@ function FeedTimeline({
                           type="button"
                           onClick={() => handleVoteClick(event.id, 'bookmark', voteState)}
                           className={cn(
-                            'cursor-pointer rounded-full border px-2 py-1 transition-colors',
+                            'cursor-pointer rounded-full border px-2 py-1 transition-all duration-200',
                             voteState.my_vote.includes('bookmark')
                               ? 'border-amber-300/70 bg-amber-300/25 text-amber-100'
-                              : 'border-slate-700/70 bg-slate-900/50 text-slate-400 hover:border-slate-500/80 hover:text-slate-200',
+                              : 'border-white/10 bg-slate-950/55 text-slate-400 hover:border-slate-400/40 hover:text-slate-200',
                           )}
                           aria-pressed={voteState.my_vote.includes('bookmark')}
                           aria-label={`收藏 ${event.title}`}
@@ -1959,13 +2199,13 @@ export function AiHotboardScreen({
           />
 
           {wechatLoading ? (
-            <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
+            <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
               <div className="text-sm text-slate-300">正在读取公众号 feed...</div>
             </section>
           ) : null}
 
           {wechatError ? (
-            <section className="rounded-3xl border border-rose-400/30 bg-rose-400/10 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
+            <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
               <div className="text-sm text-rose-100">公众号 feed 读取失败：{wechatError}</div>
             </section>
           ) : null}
@@ -1992,13 +2232,13 @@ export function AiHotboardScreen({
           />
 
           {zaraLoading ? (
-            <section className="rounded-3xl border border-slate-700/70 bg-slate-900/70 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
+            <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
               <div className="text-sm text-slate-300">正在读取 Zara YouTube 精选...</div>
             </section>
           ) : null}
 
           {zaraError ? (
-            <section className="rounded-3xl border border-rose-400/30 bg-rose-400/10 px-5 py-5 shadow-[0_16px_36px_rgba(2,6,23,0.45)]">
+            <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
               <div className="text-sm text-rose-100">Zara 源读取失败：{zaraError}</div>
             </section>
           ) : null}
@@ -2011,22 +2251,38 @@ export function AiHotboardScreen({
     return (
       <>
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
-            <div className="text-xs tracking-[0.2em] text-slate-500">EVENTS</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-100">{feedStats.totalEvents}</div>
-          </div>
-          <div className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
-            <div className="text-xs tracking-[0.2em] text-slate-500">LIKES</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-100">{feedStats.totalLikes}</div>
-          </div>
-          <div className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
-            <div className="text-xs tracking-[0.2em] text-slate-500">BOOKMARKS</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-100">{feedStats.totalBookmarks}</div>
-          </div>
-          <div className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
-            <div className="text-xs tracking-[0.2em] text-slate-500">AVG SIGNAL</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-100">{feedStats.averageSignalScore}</div>
-          </div>
+          <HotboardStatCard
+            label="EVENTS"
+            value={feedStats.totalEvents}
+            icon={ActivitySparkIcon}
+            helper="实时进入看板的事件条目"
+            trendLabel="FLOW"
+            tone="cyan"
+          />
+          <HotboardStatCard
+            label="LIKES"
+            value={feedStats.totalLikes}
+            icon={AnalyticsUpIcon}
+            helper="点赞回流代表即时热度"
+            trendLabel="HEAT"
+            tone="emerald"
+          />
+          <HotboardStatCard
+            label="BOOKMARKS"
+            value={feedStats.totalBookmarks}
+            icon={Bookmark02Icon}
+            helper="收藏是更高意图的沉淀"
+            trendLabel="SAVE"
+            tone="amber"
+          />
+          <HotboardStatCard
+            label="AVG SIGNAL"
+            value={feedStats.averageSignalScore}
+            icon={AnalyticsUpIcon}
+            helper="综合信号强度均值"
+            trendLabel="HIGH"
+            tone="cyan"
+          />
         </section>
 
         <FeedTimeline
@@ -2051,21 +2307,29 @@ export function AiHotboardScreen({
   }
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto bg-slate-950 text-slate-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] gap-4 px-3 py-4 sm:gap-5 sm:px-4 lg:px-6">
+    <div className="fixed inset-0 z-[120] overflow-y-auto text-slate-100" style={HOTBOARD_BACKGROUND_STYLE}>
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-24 top-0 h-[26rem] w-[26rem] rounded-full bg-cyan-300/12 blur-[120px]" />
+        <div className="absolute right-[-8rem] top-20 h-[22rem] w-[22rem] rounded-full bg-amber-300/10 blur-[140px]" />
+        <div className="absolute bottom-[-10rem] left-1/3 h-[24rem] w-[24rem] rounded-full bg-sky-500/8 blur-[150px]" />
+      </div>
+
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1480px] gap-4 px-3 py-4 sm:gap-5 sm:px-4 lg:px-6">
         <aside
-          className="w-[252px] shrink-0 rounded-3xl border border-slate-700/60 bg-slate-950/95 p-4 shadow-[0_30px_80px_rgba(2,6,23,0.6)]"
+          className={cn(HOTBOARD_PANEL_CLASS, 'w-[252px] shrink-0 rounded-[30px] p-4')}
           aria-label="AI HOT 左侧导航"
+          style={HOTBOARD_SIDEBAR_STYLE}
         >
-          <div className="mb-4 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
-            <div className="text-[11px] tracking-[0.34em] text-slate-500">SIGNAL BOARD</div>
-            <div className="mt-2 flex items-center gap-2 text-[31px] font-semibold tracking-[0.18em] text-cyan-300">
-              <span className="text-slate-100">AI</span>
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-cyan-300/65 text-base leading-none text-cyan-300">
+          <div className="mb-4 rounded-[24px] border border-white/10 bg-slate-950/55 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]" style={HOTBOARD_CARD_STYLE}>
+            <div className="text-[11px] tracking-[0.34em] text-slate-500" style={EDITORIAL_MONO_STYLE}>SIGNAL BOARD</div>
+            <div className="mt-3 flex items-center gap-2 text-cyan-300">
+              <span className="text-[2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>AI</span>
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-cyan-300/65 text-base leading-none text-cyan-300 shadow-[0_0_32px_rgba(34,211,238,0.18)] animate-pulse [animation-duration:6s]">
                 ○
               </span>
-              <span>HOT</span>
+              <span className="text-[2rem] leading-none" style={EDITORIAL_DISPLAY_STYLE}>HOT</span>
             </div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">Editorial darkroom for signal triage, source review, and human-in-the-loop curation.</p>
           </div>
 
           <nav className="space-y-3" aria-label="AI HOT 导航列表">
@@ -2077,7 +2341,7 @@ export function AiHotboardScreen({
             <SourceRouteItems highlightedPage={effectivePage} />
             <SidebarSectionLinkGroup title="信源提报" items={INTAKE_ROUTE_ITEMS} highlightedKey={intakeHighlightedKey(effectivePage)} />
 
-            <div className="px-1 text-xs tracking-[0.24em] text-slate-500">策略</div>
+            <div className="px-1 text-xs tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>策略</div>
             <SidebarSectionLinkGroup
               title="精选策略"
               items={STRATEGY_ROUTE_ITEMS}
@@ -2091,23 +2355,37 @@ export function AiHotboardScreen({
               testId="strategy-iteration-section"
             />
 
-            <div className="px-1 text-xs tracking-[0.24em] text-slate-500">后台</div>
+            <div className="px-1 text-xs tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>后台</div>
             <LinkNavItems items={SYSTEM_NAV_ITEMS} highlightedKey={systemPageHighlightedNavKey(effectivePage)} />
           </nav>
         </aside>
 
-        <main className="min-w-0 flex-1 rounded-3xl border border-slate-700/60 bg-slate-900/65 p-4 shadow-[0_30px_80px_rgba(2,6,23,0.5)] sm:p-5 lg:p-6">
-          <header className="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-700/60 bg-slate-900/80 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+        <main
+          className={cn(HOTBOARD_PANEL_CLASS, 'min-w-0 flex-1 rounded-[32px] p-4 sm:p-5 lg:p-6')}
+          style={HOTBOARD_PANEL_STYLE}
+        >
+          <header className="mb-6 flex flex-col gap-4 rounded-[26px] border border-white/10 px-5 py-5 shadow-[0_24px_56px_rgba(2,6,23,0.36),inset_0_1px_0_rgba(255,255,255,0.04)] sm:flex-row sm:items-end sm:justify-between" style={HOTBOARD_CARD_STYLE}>
             <div>
-              <div className="text-[11px] tracking-[0.32em] text-cyan-300/80">AI HOTBOARD</div>
-              <h1 className="mt-2 text-2xl font-semibold text-slate-100 sm:text-3xl">{feedHeading.title}</h1>
-              <p className="mt-1 text-sm text-slate-300">{feedHeading.subtitle}</p>
+              <div className="text-[11px] tracking-[0.32em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>AI HOTBOARD</div>
+              <h1 className="mt-3 text-[2.9rem] leading-none text-slate-100 sm:text-[3.55rem]" style={EDITORIAL_DISPLAY_STYLE}>
+                {feedHeading.title}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-[15px]">{feedHeading.subtitle}</p>
             </div>
-            <div className="flex flex-col gap-2 rounded-xl border border-slate-700/60 bg-slate-950/45 px-3 py-2 text-sm text-slate-300">
-              <div>更新时间：{formatGeneratedAt(remoteGeneratedAt)}</div>
-              <div>数据来源：{remoteSourceLabel}</div>
-              <div className="flex items-center justify-between gap-2 rounded-md border border-slate-700/50 bg-slate-900/60 px-2 py-1">
-                <span>
+            <div className="flex min-w-[19rem] flex-col gap-2 rounded-[20px] border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="text-[11px] tracking-[0.2em] text-slate-500" style={EDITORIAL_MONO_STYLE}>LIVE META</div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500" style={EDITORIAL_MONO_STYLE}>更新时间</div>
+                  <div className="mt-1 text-slate-100">{formatGeneratedAt(remoteGeneratedAt)}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500" style={EDITORIAL_MONO_STYLE}>数据来源</div>
+                  <div className="mt-1 truncate text-slate-100">{remoteSourceLabel}</div>
+                </div>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2 rounded-[16px] border border-white/10 bg-slate-900/55 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                <span className="text-sm">
                   欢迎 {authUser?.display_name ?? '成员'}
                   {authUser?.role === 'owner' ? ' (admin)' : ''}
                 </span>
@@ -2117,7 +2395,7 @@ export function AiHotboardScreen({
                     void handleLogout()
                   }}
                   disabled={isLoggingOut}
-                  className="rounded border border-slate-600/70 px-2 py-0.5 text-xs text-slate-200 transition-colors hover:border-slate-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className={cn(HOTBOARD_SECONDARY_BUTTON_CLASS, 'border-amber-300/20 text-slate-100 hover:border-amber-200/45')}
                 >
                   {isLoggingOut ? '退出中...' : '登出'}
                 </button>
