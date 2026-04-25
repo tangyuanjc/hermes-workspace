@@ -12,6 +12,7 @@ type XTweet = {
   id?: string
   author?: string
   name?: string
+  source_user?: string
   text?: string
   likes?: number
   retweets?: number
@@ -59,6 +60,7 @@ type HotboardFeedEvent = {
   event_id: string
   source: Exclude<XSignalSource, 'all'>
   source_line: string
+  source_user: string
   title: string
   summary: string
   signal_score: number
@@ -127,6 +129,10 @@ function normalizeSourceLine(tweet: XTweet) {
   return '@unknown'
 }
 
+function normalizeSourceUser(tweet: XTweet) {
+  return (tweet.source_user ?? '').trim()
+}
+
 function normalizeTitle(tweet: XTweet) {
   const summary = truncateSummary(tweet.text ?? '')
   if (summary.length === 0) return 'X 信号更新'
@@ -148,6 +154,7 @@ function toHotboardEvent(
     event_id: eventId,
     source,
     source_line: normalizeSourceLine(tweet),
+    source_user: normalizeSourceUser(tweet),
     title: normalizeTitle(tweet),
     summary: truncateSummary(tweet.text ?? '') || '暂无内容',
     signal_score: inferSignalScore(tweet, source),
@@ -242,6 +249,7 @@ function loadFallbackEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
     event_id: event.id,
     source: mappedSource,
     source_line: `${event.source_type} · ${event.source_name} · ${event.source_channel}`,
+    source_user: '',
     title: event.title,
     summary: truncateSummary(event.summary),
     signal_score: Math.max(
