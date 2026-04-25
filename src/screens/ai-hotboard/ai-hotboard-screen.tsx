@@ -1828,7 +1828,7 @@ export function AiHotboardScreen({
         method: 'POST',
       })
     } finally {
-      window.location.href = '/ai-hotboard'
+      window.location.href = '/ai-hotboard/logout'
     }
   }
 
@@ -2385,10 +2385,20 @@ export function AiHotboardScreen({
                 </div>
               </div>
               <div className="mt-1 flex items-center justify-between gap-2 rounded-[16px] border border-white/10 bg-slate-900/55 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                <span className="text-sm">
-                  欢迎 {authUser?.display_name ?? '成员'}
-                  {authUser?.role === 'owner' ? ' (admin)' : ''}
-                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm text-slate-100">欢迎 {authUser?.display_name ?? '未登录'}</div>
+                  <div
+                    className={cn(
+                      'mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-[0.18em]',
+                      authUser?.role === 'owner'
+                        ? 'border-amber-300/80 bg-amber-400/10 text-amber-200'
+                        : 'border-slate-500/60 bg-slate-700/25 text-slate-300',
+                    )}
+                    style={EDITORIAL_MONO_STYLE}
+                  >
+                    {authUser?.role === 'owner' ? 'OWNER' : 'MEMBER'}
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -2397,7 +2407,7 @@ export function AiHotboardScreen({
                   disabled={isLoggingOut}
                   className={cn(HOTBOARD_SECONDARY_BUTTON_CLASS, 'border-amber-300/20 text-slate-100 hover:border-amber-200/45')}
                 >
-                  {isLoggingOut ? '退出中...' : '登出'}
+                  {isLoggingOut ? '切换中...' : '切换账号'}
                 </button>
               </div>
             </div>

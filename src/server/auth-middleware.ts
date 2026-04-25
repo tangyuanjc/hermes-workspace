@@ -34,6 +34,7 @@ type SessionUserRow = {
 type SessionRow = {
   token: string
   user_id: string
+  created_at: string
   expires_at: string
 }
 
@@ -280,7 +281,7 @@ export class SessionStore {
 
   getSession(token: string): SessionRow | null {
     const stmt = this.db.prepare(`
-      SELECT token, user_id, expires_at
+      SELECT token, user_id, expires_at, created_at
       FROM sessions
       WHERE token = ?
       LIMIT 1
@@ -303,6 +304,13 @@ export class SessionStore {
   isValidSessionToken(token: string): boolean {
     return this.getSessionUserByToken(token) !== null
   }
+}
+
+export type SessionWithUser = {
+  token: string
+  user: SessionUser
+  created_at: string
+  expires_at: string
 }
 
 export function createSessionStore(options: { dbPath?: string } = {}) {
@@ -420,6 +428,30 @@ export function getSessionUser(request: Request): SessionUser | null {
   const token = getSessionTokenFromCookie(cookieHeader)
   if (!token) return null
   return createSessionStore().getSessionUserByToken(token)
+}
+
+export function getSessionWithUser(request: Request): SessionWithUser | null {
+  const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+  if (!token) return null
+
+  const store = createSessionStore()
+  const session = store.getSession(token)
+  if (!session) return null
+
+  if (isExpired(session.expires_at)) {
+    store.revokeSessionToken(token)
+    return null
+  }
+
+  const user = store.getUserById(session.user_id)
+  if (!user) return null
+
+  return {
+    token,
+    user,
+    created_at: session.created_at,
+    expires_at: session.expires_at,
+  }
 }
 
 function isLocalRequest(request: Request): boolean {

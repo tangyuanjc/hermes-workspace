@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-with-hotboard-bootstrap.mjs",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node .output/server/index.mjs",
     "start:dev": "node scripts/dev-with-hotboard-bootstrap.mjs",
