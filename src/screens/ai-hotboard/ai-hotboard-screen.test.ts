@@ -1,6 +1,10 @@
+// @vitest-environment jsdom
+import { createElement } from 'react'
 import { describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import {
   buildFeedStats,
+  FeedTimeline,
   RECOMMEND_BANNER_CLASS,
   SIDEBAR_NAV_SEQUENCE,
   SIGNAL_BADGE_CLASS,
@@ -30,6 +34,7 @@ function makeTimelineEvent(overrides: Partial<TimelineEvent> & Pick<TimelineEven
     engagement: { likes: 10, dislikes: 0, bookmarks: 5 },
     recommend_reason: '',
     suggested_action: '',
+    source_user: '',
     signalScore: 80,
     actionLine: '',
     recommendReasonLine: '',
@@ -90,6 +95,38 @@ describe('ai-hotboard screen handoff constraints', () => {
 
     expect(RECOMMEND_BANNER_CLASS).toContain('bg-emerald-950/70')
     expect(RECOMMEND_BANNER_CLASS).not.toContain('border-l')
+  })
+})
+
+describe('FeedTimeline source user pill', () => {
+  const voteAggregate = { like_count: 0, dislike_count: 0, bookmark_count: 0, my_vote: [] }
+
+  it('renders a KOL pill for X events with source_user', () => {
+    render(
+      createElement(FeedTimeline, {
+        timelineGroups: [{ timestamp: '10:00', events: [makeTimelineEvent({ id: 'evt-kol', source_user: 'builder' })] }],
+        resolveVoteAggregate: () => voteAggregate,
+        handleVoteClick: () => {},
+      }),
+    )
+
+    expect(screen.getByTestId('x-source-user-pill').textContent).toBe('@builder')
+
+    cleanup()
+  })
+
+  it('does not render a KOL pill when source_user is empty', () => {
+    render(
+      createElement(FeedTimeline, {
+        timelineGroups: [{ timestamp: '10:00', events: [makeTimelineEvent({ id: 'evt-empty', source_user: '' })] }],
+        resolveVoteAggregate: () => voteAggregate,
+        handleVoteClick: () => {},
+      }),
+    )
+
+    expect(screen.queryByTestId('x-source-user-pill')).toBeNull()
+
+    cleanup()
   })
 })
 

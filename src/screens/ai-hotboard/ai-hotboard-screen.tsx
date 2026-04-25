@@ -1243,7 +1243,7 @@ function BasicPagePanel({
   )
 }
 
-function FeedTimeline({
+export function FeedTimeline({
   timelineGroups,
   resolveVoteAggregate,
   handleVoteClick,
@@ -1283,6 +1283,7 @@ function FeedTimeline({
           <div className="space-y-3">
             {group.events.map((event) => {
               const voteState = resolveVoteAggregate(event)
+              const sourceUser = event.source_user?.trim()
               return (
                 <article
                   key={event.id}
@@ -1299,6 +1300,18 @@ function FeedTimeline({
                       <h2 className="text-[1.9rem] leading-[1.08] text-slate-100 sm:text-[2.15rem]" style={EDITORIAL_DISPLAY_STYLE}>
                         {event.title}
                       </h2>
+
+                      {sourceUser ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300/70"
+                            data-testid="x-source-user-pill"
+                            style={EDITORIAL_MONO_STYLE}
+                          >
+                            @{sourceUser}
+                          </span>
+                        </div>
+                      ) : null}
 
                       <p className="text-[15px] leading-8 text-slate-200/92">{event.summary}</p>
                     </div>

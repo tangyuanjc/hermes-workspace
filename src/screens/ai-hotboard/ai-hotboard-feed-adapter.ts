@@ -21,6 +21,7 @@ export type MockEvent = {
   }
   recommend_reason: string
   suggested_action: string
+  source_user?: string
 }
 
 const SUPPORTED_SOURCES: HotboardSource[] = [
@@ -120,6 +121,7 @@ export function mapFeedEventToMockEvent(
   const likes = Number(item.likes ?? 0)
   const signalScore = Number(item.signal_score ?? 0)
   const sourceLine = String(item.source_line ?? 'Signal Feed')
+  const sourceUser = String(item.source_user ?? '').trim()
   const sourceNameParts = sourceLine
     .split('·')
     .map((segment) => segment.trim())
@@ -149,6 +151,7 @@ export function mapFeedEventToMockEvent(
     },
     recommend_reason: '推荐理由：来自 X 实时信号同步',
     suggested_action: '触发 skill：x-signal-review（高价值信号二次判断）',
+    source_user: sourceUser,
   }
 }
 
