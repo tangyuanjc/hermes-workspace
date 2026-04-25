@@ -114,6 +114,7 @@ import { Route as AiHotboardViewLowFollowerRouteImport } from './routes/ai-hotbo
 import { Route as AiHotboardViewBookmarksRouteImport } from './routes/ai-hotboard/view/bookmarks'
 import { Route as AiHotboardViewAllRouteImport } from './routes/ai-hotboard/view/all'
 import { Route as AiHotboardStrategyLineRouteImport } from './routes/ai-hotboard/strategy/$line'
+import { Route as AiHotboardSourcesHealthRouteImport } from './routes/ai-hotboard/sources/health'
 import { Route as AiHotboardSourceSourceRouteImport } from './routes/ai-hotboard/source/$source'
 import { Route as AiHotboardIntakeXiaojExecutionRouteImport } from './routes/ai-hotboard/intake/xiaoj-execution'
 import { Route as AiHotboardIntakeHermesStrategyRouteImport } from './routes/ai-hotboard/intake/hermes-strategy'
@@ -651,6 +652,11 @@ const AiHotboardStrategyLineRoute = AiHotboardStrategyLineRouteImport.update({
   path: '/strategy/$line',
   getParentRoute: () => AiHotboardRoute,
 } as any)
+const AiHotboardSourcesHealthRoute = AiHotboardSourcesHealthRouteImport.update({
+  id: '/sources/health',
+  path: '/sources/health',
+  getParentRoute: () => AiHotboardRoute,
+} as any)
 const AiHotboardSourceSourceRoute = AiHotboardSourceSourceRouteImport.update({
   id: '/source/$source',
   path: '/source/$source',
@@ -772,6 +778,7 @@ export interface FileRoutesByFullPath {
   '/ai-hotboard/intake/hermes-strategy': typeof AiHotboardIntakeHermesStrategyRoute
   '/ai-hotboard/intake/xiaoj-execution': typeof AiHotboardIntakeXiaojExecutionRoute
   '/ai-hotboard/source/$source': typeof AiHotboardSourceSourceRoute
+  '/ai-hotboard/sources/health': typeof AiHotboardSourcesHealthRoute
   '/ai-hotboard/strategy/$line': typeof AiHotboardStrategyLineRoute
   '/ai-hotboard/view/all': typeof AiHotboardViewAllRoute
   '/ai-hotboard/view/bookmarks': typeof AiHotboardViewBookmarksRoute
@@ -887,6 +894,7 @@ export interface FileRoutesByTo {
   '/ai-hotboard/intake/hermes-strategy': typeof AiHotboardIntakeHermesStrategyRoute
   '/ai-hotboard/intake/xiaoj-execution': typeof AiHotboardIntakeXiaojExecutionRoute
   '/ai-hotboard/source/$source': typeof AiHotboardSourceSourceRoute
+  '/ai-hotboard/sources/health': typeof AiHotboardSourcesHealthRoute
   '/ai-hotboard/strategy/$line': typeof AiHotboardStrategyLineRoute
   '/ai-hotboard/view/all': typeof AiHotboardViewAllRoute
   '/ai-hotboard/view/bookmarks': typeof AiHotboardViewBookmarksRoute
@@ -1005,6 +1013,7 @@ export interface FileRoutesById {
   '/ai-hotboard/intake/hermes-strategy': typeof AiHotboardIntakeHermesStrategyRoute
   '/ai-hotboard/intake/xiaoj-execution': typeof AiHotboardIntakeXiaojExecutionRoute
   '/ai-hotboard/source/$source': typeof AiHotboardSourceSourceRoute
+  '/ai-hotboard/sources/health': typeof AiHotboardSourcesHealthRoute
   '/ai-hotboard/strategy/$line': typeof AiHotboardStrategyLineRoute
   '/ai-hotboard/view/all': typeof AiHotboardViewAllRoute
   '/ai-hotboard/view/bookmarks': typeof AiHotboardViewBookmarksRoute
@@ -1124,6 +1133,7 @@ export interface FileRouteTypes {
     | '/ai-hotboard/intake/hermes-strategy'
     | '/ai-hotboard/intake/xiaoj-execution'
     | '/ai-hotboard/source/$source'
+    | '/ai-hotboard/sources/health'
     | '/ai-hotboard/strategy/$line'
     | '/ai-hotboard/view/all'
     | '/ai-hotboard/view/bookmarks'
@@ -1239,6 +1249,7 @@ export interface FileRouteTypes {
     | '/ai-hotboard/intake/hermes-strategy'
     | '/ai-hotboard/intake/xiaoj-execution'
     | '/ai-hotboard/source/$source'
+    | '/ai-hotboard/sources/health'
     | '/ai-hotboard/strategy/$line'
     | '/ai-hotboard/view/all'
     | '/ai-hotboard/view/bookmarks'
@@ -1356,6 +1367,7 @@ export interface FileRouteTypes {
     | '/ai-hotboard/intake/hermes-strategy'
     | '/ai-hotboard/intake/xiaoj-execution'
     | '/ai-hotboard/source/$source'
+    | '/ai-hotboard/sources/health'
     | '/ai-hotboard/strategy/$line'
     | '/ai-hotboard/view/all'
     | '/ai-hotboard/view/bookmarks'
@@ -2232,6 +2244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AiHotboardStrategyLineRouteImport
       parentRoute: typeof AiHotboardRoute
     }
+    '/ai-hotboard/sources/health': {
+      id: '/ai-hotboard/sources/health'
+      path: '/sources/health'
+      fullPath: '/ai-hotboard/sources/health'
+      preLoaderRoute: typeof AiHotboardSourcesHealthRouteImport
+      parentRoute: typeof AiHotboardRoute
+    }
     '/ai-hotboard/source/$source': {
       id: '/ai-hotboard/source/$source'
       path: '/source/$source'
@@ -2314,6 +2333,7 @@ interface AiHotboardRouteChildren {
   AiHotboardIntakeHermesStrategyRoute: typeof AiHotboardIntakeHermesStrategyRoute
   AiHotboardIntakeXiaojExecutionRoute: typeof AiHotboardIntakeXiaojExecutionRoute
   AiHotboardSourceSourceRoute: typeof AiHotboardSourceSourceRoute
+  AiHotboardSourcesHealthRoute: typeof AiHotboardSourcesHealthRoute
   AiHotboardStrategyLineRoute: typeof AiHotboardStrategyLineRoute
   AiHotboardViewAllRoute: typeof AiHotboardViewAllRoute
   AiHotboardViewBookmarksRoute: typeof AiHotboardViewBookmarksRoute
@@ -2329,6 +2349,7 @@ const AiHotboardRouteChildren: AiHotboardRouteChildren = {
   AiHotboardIntakeHermesStrategyRoute: AiHotboardIntakeHermesStrategyRoute,
   AiHotboardIntakeXiaojExecutionRoute: AiHotboardIntakeXiaojExecutionRoute,
   AiHotboardSourceSourceRoute: AiHotboardSourceSourceRoute,
+  AiHotboardSourcesHealthRoute: AiHotboardSourcesHealthRoute,
   AiHotboardStrategyLineRoute: AiHotboardStrategyLineRoute,
   AiHotboardViewAllRoute: AiHotboardViewAllRoute,
   AiHotboardViewBookmarksRoute: AiHotboardViewBookmarksRoute,

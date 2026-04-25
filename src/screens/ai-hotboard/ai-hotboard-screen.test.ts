@@ -71,6 +71,7 @@ describe('ai-hotboard screen handoff constraints', () => {
       '策略迭代',
       '系统',
       '用户',
+      '信源健康',
       '退出',
     ])
 

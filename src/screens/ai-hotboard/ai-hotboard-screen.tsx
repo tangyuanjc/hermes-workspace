@@ -191,6 +191,7 @@ const PRIMARY_NAV_ITEMS = [
 const SYSTEM_NAV_ITEMS = [
   { key: 'system', label: '系统', to: '/ai-hotboard/system' },
   { key: 'user', label: '用户', to: '/ai-hotboard/user' },
+  { key: 'source-health', label: '信源健康', to: '/ai-hotboard/sources/health' },
   { key: 'logout', label: '退出', to: '/ai-hotboard/logout' },
 ] as const
 
