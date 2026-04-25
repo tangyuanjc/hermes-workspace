@@ -63,6 +63,32 @@ describe('hotboard wechat store', () => {
     expect(fetched?.excerpt).toBe('第二版摘要')
   })
 
+  it('preserves legacy /s identity query params while dropping tracking params', () => {
+    const first = normalizeWechatUrl(
+      'https://mp.weixin.qq.com/s?__biz=A&mid=1&idx=1&sn=aaa&utm_source=x&scene=21#wechat_redirect',
+    )
+    const second = normalizeWechatUrl(
+      'https://mp.weixin.qq.com/s?__biz=B&mid=2&idx=1&sn=bbb&utm_source=x&scene=21',
+    )
+    const sameArticleWithTracking = normalizeWechatUrl(
+      'https://mp.weixin.qq.com/s?scene=21&__biz=A&mid=1&idx=1&sn=aaa&utm_medium=y',
+    )
+
+    expect(first).toBe('https://mp.weixin.qq.com/s?__biz=A&mid=1&idx=1&sn=aaa')
+    expect(second).toBe('https://mp.weixin.qq.com/s?__biz=B&mid=2&idx=1&sn=bbb')
+    expect(first).not.toBe(second)
+    expect(sameArticleWithTracking).toBe(first)
+  })
+
+  it('continues to drop search params for non-legacy paths', () => {
+    expect(normalizeWechatUrl('https://mp.weixin.qq.com/s/token-1?__biz=A&mid=1#x')).toBe(
+      'https://mp.weixin.qq.com/s/token-1',
+    )
+    expect(normalizeWechatUrl('https://mp.weixin.qq.com/news/article?utm_source=x')).toBe(
+      'https://mp.weixin.qq.com/news/article',
+    )
+  })
+
   it('lists recent articles ordered by publish_time desc and respects limit', () => {
     const store = createWechatStore({ dbPath: createTempDbPath() })
 

@@ -37,14 +37,24 @@ function normalizeLimit(limit = 50) {
 
 export function normalizeWechatUrl(url: string) {
   const parsed = new URL(url.trim())
-  parsed.search = ''
   parsed.hash = ''
+
+  if (parsed.pathname === '/s') {
+    const preserved = new URLSearchParams()
+    for (const key of ['__biz', 'mid', 'idx', 'sn']) {
+      const value = parsed.searchParams.get(key)
+      if (value !== null) preserved.set(key, value)
+    }
+    parsed.search = preserved.toString()
+  } else {
+    parsed.search = ''
+  }
 
   if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
     parsed.pathname = parsed.pathname.slice(0, -1)
   }
 
-  return `${parsed.origin}${parsed.pathname}`
+  return `${parsed.origin}${parsed.pathname}${parsed.search}`
 }
 
 export function buildWechatArticleId(url: string) {
