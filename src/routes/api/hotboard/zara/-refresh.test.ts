@@ -129,6 +129,25 @@ describe('hotboard zara refresh route', () => {
     })
   })
 
+  it('returns an ok empty payload when the scraper detects no items', async () => {
+    const { token } = setupTempAuth('owner', 'empty')
+    mockState.scrapeZaraYoutubeLibrary.mockResolvedValue([])
+    mockState.upsertItems.mockReturnValue({ added: 0, updated: 0, total: 0 })
+
+    const response = await handleHotboardZaraRefreshPost(makeRequest(token))
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload).toEqual({
+      ok: true,
+      added: 0,
+      updated: 0,
+      total: 0,
+      items: [],
+      message: 'no items detected',
+    })
+  })
+
   it('rejects unauthenticated and non-owner refresh requests', async () => {
     const unauthorized = await handleHotboardZaraRefreshPost(makeRequest(null))
     expect(unauthorized.status).toBe(401)

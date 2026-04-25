@@ -32,6 +32,17 @@ export async function handleHotboardZaraRefreshPost(request: Request): Promise<R
   }
 
   const items = await scrapeZaraYoutubeLibrary()
+  if (items.length === 0) {
+    return json({
+      ok: true,
+      added: 0,
+      updated: 0,
+      total: 0,
+      items: [],
+      message: 'no items detected',
+    })
+  }
+
   const store = createZaraStore()
   const result = store.upsertItems(items)
 

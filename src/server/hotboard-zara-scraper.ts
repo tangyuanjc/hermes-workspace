@@ -3,6 +3,10 @@ import type { ZaraYoutubeItem } from './hotboard-zara-types'
 
 const ZARA_LIBRARY_URL = 'https://zara.faces.site/ai'
 
+type ScrapeResult = ZaraYoutubeItem[]
+
+let runningPromise: Promise<ScrapeResult> | null = null
+
 function extractVideoId(rawUrl: string) {
   try {
     const parsed = new URL(rawUrl)
@@ -42,68 +46,72 @@ function textFromHtml(value: string | null | undefined) {
   return normalizeText(decodeHtmlEntities((value ?? '').replace(/<[^>]+>/g, ' ')))
 }
 
+function extractYoutubeHref(block: string) {
+  const hrefMatch = block.match(/href="([^"]*(?:youtube\.com\/watch\?v=[^"&]+|youtu\.be\/[^"?&/]+)[^"]*)"/i)
+  return hrefMatch ? decodeHtmlEntities(hrefMatch[1]) : ''
+}
+
+function parseYoutubeBlock(block: string): ZaraYoutubeItem | null {
+  const url = extractYoutubeHref(block)
+  const videoId = extractVideoId(url)
+  if (!videoId) return null
+
+  const titleMatch = block.match(/href="[^"]*(?:youtube\.com\/watch\?v=[^"]*|youtu\.be\/[^"]*)"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i)
+  const title = textFromHtml(titleMatch?.[1])
+  if (!title || /^watch on longcut$/i.test(title)) return null
+
+  const tagMatches = Array.from(block.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/gi), (match) =>
+    textFromHtml(match[1]),
+  ).filter(Boolean)
+
+  const afterTitle = titleMatch?.index === undefined ? block : block.slice(titleMatch.index + titleMatch[0].length)
+  const paragraphTexts = Array.from(afterTitle.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi), (match) =>
+    textFromHtml(match[1]),
+  ).filter((text) => text && !/^watch on longcut$/i.test(text))
+
+  return {
+    videoId,
+    url,
+    title,
+    channel: paragraphTexts[0] || undefined,
+    tags: tagMatches,
+    description: paragraphTexts[1] || undefined,
+    thumbnailUrl: buildYoutubeThumbnailUrl(url),
+  }
+}
+
 function parseZaraYoutubeCards(html: string): ZaraYoutubeItem[] {
+  const items: ZaraYoutubeItem[] = []
+  const seen = new Set<string>()
   const cardMatches = Array.from(
-    html.matchAll(/<div class="bg-white rounded-lg[\s\S]*?(?=<div class="bg-white rounded-lg|<\/div><\/div><\/div><\/div><\/div><div data-face-id=|$)/gi),
+    html.matchAll(/<div[^>]*class="[^"]*(?:bg-white[^"]*rounded|rounded[^"]*bg-white)[^"]*"[\s\S]*?(?=<div[^>]*class="[^"]*(?:bg-white[^"]*rounded|rounded[^"]*bg-white)[^"]*"|<article\b|$)/gi),
     (match) => match[0],
   )
 
-  const items: ZaraYoutubeItem[] = []
-  const seen = new Set<string>()
+  const candidateBlocks = cardMatches.length > 0 ? cardMatches : Array.from(
+    html.matchAll(/<a[^>]+href="[^"]*(?:youtube\.com\/watch\?v=|youtu\.be\/)[^"]*"[\s\S]*?(?=<a[^>]+href="[^"]*(?:youtube\.com\/watch\?v=|youtu\.be\/)|$)/gi),
+    (match) => match[0],
+  )
 
-  for (const card of cardMatches) {
-    const hrefMatch = card.match(/href="([^"]*youtube\.com\/watch\?v=[^"&]+[^"]*)"/i)
-    if (!hrefMatch) continue
-
-    const url = decodeHtmlEntities(hrefMatch[1])
-    const videoId = extractVideoId(url)
-    if (!videoId || seen.has(videoId)) continue
-
-    const titleMatch = card.match(/href="[^"]*youtube\.com\/watch\?v=[^"]*"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i)
-    const title = textFromHtml(titleMatch?.[1])
-    if (!title || /^watch on longcut$/i.test(title)) continue
-
-    const tagMatches = Array.from(card.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/gi), (match) =>
-      textFromHtml(match[1]),
-    ).filter(Boolean)
-
-    const afterTitle = titleMatch?.index === undefined ? card : card.slice(titleMatch.index + titleMatch[0].length)
-    const paragraphTexts = Array.from(afterTitle.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi), (match) =>
-      textFromHtml(match[1]),
-    ).filter((text) => text && !/^watch on longcut$/i.test(text))
-
-    seen.add(videoId)
-    items.push({
-      videoId,
-      url,
-      title,
-      channel: paragraphTexts[0] || undefined,
-      tags: tagMatches,
-      description: paragraphTexts[1] || undefined,
-      thumbnailUrl: buildYoutubeThumbnailUrl(url),
-    })
+  for (const block of candidateBlocks) {
+    const item = parseYoutubeBlock(block)
+    if (!item || seen.has(item.videoId)) continue
+    seen.add(item.videoId)
+    items.push(item)
   }
 
   return items
 }
 
-export function parseZaraYoutubeHtml(html: string): ZaraYoutubeItem[] {
+function parseZaraYoutubeArticles(html: string): ZaraYoutubeItem[] {
   const matches = Array.from(
     html.matchAll(/<article[\s\S]*?<\/article>/gi),
     (match) => match[0],
   )
-
-  if (matches.length === 0) {
-    return parseZaraYoutubeCards(html)
-  }
-
   const items: ZaraYoutubeItem[] = []
 
   for (const article of matches) {
-    const hrefMatch = article.match(/href="([^"]*(?:youtube\.com\/watch\?v=[^"&]+|youtu\.be\/[^"?&/]+)[^"]*)"/i)
-    if (!hrefMatch) continue
-
-    const url = hrefMatch[1]
+    const url = extractYoutubeHref(article)
     const videoId = extractVideoId(url)
     if (!videoId) continue
 
@@ -137,13 +145,31 @@ export function parseZaraYoutubeHtml(html: string): ZaraYoutubeItem[] {
   return items
 }
 
-export async function scrapeZaraYoutubeLibrary(): Promise<ZaraYoutubeItem[]> {
+function dedupeByVideoId(items: ZaraYoutubeItem[]) {
+  const seen = new Set<string>()
+  const deduped: ZaraYoutubeItem[] = []
+  for (const item of items) {
+    if (seen.has(item.videoId)) continue
+    seen.add(item.videoId)
+    deduped.push(item)
+  }
+  return deduped
+}
+
+export function parseZaraYoutubeHtml(html: string): ZaraYoutubeItem[] {
+  return dedupeByVideoId([
+    ...parseZaraYoutubeArticles(html),
+    ...parseZaraYoutubeCards(html),
+  ])
+}
+
+async function runZaraYoutubeScrape(): Promise<ScrapeResult> {
   const { chromium } = await import('playwright')
   const browser = await chromium.launch({ headless: true })
 
   try {
     const page = await browser.newPage()
-    await page.goto(ZARA_LIBRARY_URL, { waitUntil: 'domcontentloaded' })
+    await page.goto(ZARA_LIBRARY_URL, { waitUntil: 'domcontentloaded', timeout: 30000 })
     await page.waitForLoadState('networkidle')
 
     const expandButton = page.getByRole('button', { name: /view complete collection/i })
@@ -153,5 +179,16 @@ export async function scrapeZaraYoutubeLibrary(): Promise<ZaraYoutubeItem[]> {
     return parseZaraYoutubeHtml(html)
   } finally {
     await browser.close()
+  }
+}
+
+export async function scrapeZaraYoutubeLibrary(): Promise<ScrapeResult> {
+  if (runningPromise) return runningPromise
+
+  runningPromise = runZaraYoutubeScrape()
+  try {
+    return await runningPromise
+  } finally {
+    runningPromise = null
   }
 }

@@ -75,6 +75,41 @@ describe('hotboard zara scraper', () => {
     ])
   })
 
+  it('parses cards when Tailwind class order changes', () => {
+    const items = parseZaraYoutubeHtml(`
+      <div class="overflow-hidden rounded-lg bg-white shadow-sm">
+        <button>Product</button>
+        <a href="https://www.youtube.com/watch?v=IcbuTTVUY7M"><p>How to Build a Beloved AI Product</p></a>
+        <p>The MAD Podcast with Matt Turck</p>
+        <p>Learn from the founder of Granola</p>
+      </div>
+    `)
+
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      videoId: 'IcbuTTVUY7M',
+      title: 'How to Build a Beloved AI Product',
+      tags: ['Product'],
+    })
+  })
+
+  it('dedupes videos found through article and card paths', () => {
+    const items = parseZaraYoutubeHtml(`
+      <article>
+        <a href="https://www.youtube.com/watch?v=7xTGNNLPyMI"><div>Deep Dive into LLMs</div></a>
+        <div>Andrej Karpathy</div>
+        <button>Fundamentals</button>
+      </article>
+      <div class="bg-white rounded-lg">
+        <button>Fundamentals</button>
+        <a href="https://www.youtube.com/watch?v=7xTGNNLPyMI"><p>Deep Dive into LLMs duplicate</p></a>
+        <p>Andrej Karpathy</p>
+      </div>
+    `)
+
+    expect(items.map((item) => item.videoId)).toEqual(['7xTGNNLPyMI'])
+  })
+
   it('parses youtube cards from hydrated library html and expands the collection first', async () => {
     const click = vi.fn(async () => undefined)
     mockState.page.getByRole.mockReturnValue({ click })
@@ -84,7 +119,10 @@ describe('hotboard zara scraper', () => {
     const items = await scrapeZaraYoutubeLibrary()
 
     expect(mockState.launch).toHaveBeenCalledWith({ headless: true })
-    expect(mockState.page.goto).toHaveBeenCalledWith('https://zara.faces.site/ai', { waitUntil: 'domcontentloaded' })
+    expect(mockState.page.goto).toHaveBeenCalledWith('https://zara.faces.site/ai', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    })
     expect(mockState.page.waitForLoadState).toHaveBeenCalledWith('networkidle')
     expect(mockState.page.getByRole).toHaveBeenCalledWith('button', { name: /view complete collection/i })
     expect(click).toHaveBeenCalledTimes(1)
@@ -128,5 +166,20 @@ describe('hotboard zara scraper', () => {
 
     await expect(scrapeZaraYoutubeLibrary()).rejects.toThrow('parse failed')
     expect(mockState.browser.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('shares one running scrape across concurrent calls', async () => {
+    const click = vi.fn(async () => undefined)
+    mockState.page.getByRole.mockReturnValue({ click })
+    mockState.page.content.mockResolvedValue(`
+      <a href="https://www.youtube.com/watch?v=7xTGNNLPyMI"><p>Deep Dive into LLMs</p></a>
+      <p>Andrej Karpathy</p>
+    `)
+
+    const [first, second] = await Promise.all([scrapeZaraYoutubeLibrary(), scrapeZaraYoutubeLibrary()])
+
+    expect(mockState.launch).toHaveBeenCalledTimes(1)
+    expect(first).toEqual(second)
+    expect(first).toHaveLength(1)
   })
 })
