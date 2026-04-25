@@ -135,6 +135,32 @@ describe('hotboard wechat ingest route', () => {
     })
   })
 
+  it('accepts legacy mp.weixin.qq.com/s query article urls', async () => {
+    const { token, openId } = setupTempAuth('owner', 'legacy-url')
+    mockState.ingestWechatUrl.mockResolvedValue({
+      id: 'wechat-legacy',
+      url: 'https://mp.weixin.qq.com/s?__biz=MzA3&mid=1&idx=1&sn=abc',
+      title: 'legacy',
+      author: '机器之心',
+      publish_time: null,
+      size_bytes: null,
+      markdown_path: '/tmp/legacy.md',
+      excerpt: 'legacy',
+      fetched_at: '2026-04-24T01:00:00.000Z',
+      fetched_by_user_id: openId,
+    })
+
+    const response = await handleHotboardWechatIngestPost(
+      makeRequest(token, 'https://mp.weixin.qq.com/s?__biz=MzA3&mid=1&idx=1&sn=abc'),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mockState.ingestWechatUrl).toHaveBeenCalledWith(
+      'https://mp.weixin.qq.com/s?__biz=MzA3&mid=1&idx=1&sn=abc',
+      openId,
+    )
+  })
+
   it('rejects invalid wechat article urls with 400', async () => {
     const { token } = setupTempAuth('owner', 'bad-url')
 

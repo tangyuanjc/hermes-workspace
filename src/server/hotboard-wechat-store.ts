@@ -27,7 +27,7 @@ function resolveWechatDbPath(dbPath?: string) {
   const explicit = process.env.HERMES_HOTBOARD_WECHAT_DB_PATH?.trim()
   if (explicit) return explicit
 
-  return path.join(os.homedir(), '.hermes', 'data', 'hotboard-wechat.sqlite')
+  return path.join(os.homedir(), '.hermes', 'data', 'hotboard.sqlite')
 }
 
 function normalizeLimit(limit = 50) {
@@ -59,6 +59,10 @@ export function createWechatStore(options: { dbPath?: string } = {}) {
   const next = new WechatStore(dbPath)
   storeByPath.set(dbPath, next)
   return next
+}
+
+export function getWechatDbPath(options: { dbPath?: string } = {}) {
+  return resolveWechatDbPath(options.dbPath)
 }
 
 export function upsertArticle(

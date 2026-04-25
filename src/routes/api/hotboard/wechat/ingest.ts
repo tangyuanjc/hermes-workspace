@@ -14,7 +14,7 @@ import {
 } from '../../../../server/rate-limit'
 
 const WechatIngestSchema = z.object({
-  url: z.string().trim().url().regex(/^https:\/\/mp\.weixin\.qq\.com\/s\//),
+  url: z.string().trim().url().regex(/^https?:\/\/mp\.weixin\.qq\.com\/s(?:\/|\?)/),
 })
 
 function resolveSessionUserId(sessionUser: NonNullable<ReturnType<typeof getSessionUser>>) {

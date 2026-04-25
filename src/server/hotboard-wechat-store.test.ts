@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   buildWechatArticleId,
   createWechatStore,
+  getWechatDbPath,
   normalizeWechatUrl,
 } from './hotboard-wechat-store'
 
@@ -26,6 +27,10 @@ function createTempDbPath() {
 }
 
 describe('hotboard wechat store', () => {
+  it('defaults to the shared hotboard sqlite database', () => {
+    expect(getWechatDbPath()).toMatch(/\.hermes\/data\/hotboard\.sqlite$/)
+  })
+
   it('upserts by normalized url and resolves getArticleByUrl without query params', () => {
     const store = createWechatStore({ dbPath: createTempDbPath() })
     const canonicalUrl = normalizeWechatUrl('https://mp.weixin.qq.com/s/example-article?foo=1')
