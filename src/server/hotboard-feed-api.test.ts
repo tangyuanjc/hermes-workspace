@@ -213,6 +213,66 @@ describe('hotboard feed api handlers', () => {
     expect(new Set(payload.events.map((item) => item.event_id)).size).toBe(3)
   })
 
+  it('surfaces producer partial failures in feed meta', async () => {
+    createTempFeedFile({
+      ok: false,
+      errors: {
+        'jc:bookmarks': 'rate limited',
+      },
+      counts: { bookmarks: 0 },
+      generated_at: new Date().toISOString(),
+      bookmarks: [
+        {
+          id: 'tweet-1',
+          source_user: 'jc',
+          text: 'partial payload still has one tweet',
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const payload = (await response.json()) as {
+      fallback: boolean
+      meta: { stale: boolean; partial_failures: string[] }
+      events: Array<{ event_id: string }>
+    }
+
+    expect(payload.fallback).toBe(false)
+    expect(payload.events).toHaveLength(1)
+    expect(payload.meta).toEqual({
+      stale: false,
+      partial_failures: ['jc:bookmarks'],
+    })
+  })
+
+  it('marks x feed meta stale when generated_at is older than 24 hours', async () => {
+    createTempFeedFile({
+      ok: true,
+      errors: {},
+      generated_at: '2026-04-20T00:00:00.000Z',
+      bookmarks: [
+        {
+          id: 'tweet-stale',
+          text: 'stale tweet',
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const payload = (await response.json()) as { meta: { stale: boolean; partial_failures: string[] } }
+
+    expect(payload.meta.stale).toBe(true)
+    expect(payload.meta.partial_failures).toEqual([])
+  })
+
   it('falls back to mock data when x feed file is missing', async () => {
     setupTempAuth()
     process.env.HOTBOARD_X_SIGNAL_PATH = path.join(os.tmpdir(), 'missing-hotboard-feed.json')
@@ -230,6 +290,7 @@ describe('hotboard feed api handlers', () => {
     expect(payload.ok).toBe(true)
     expect(payload.fallback).toBe(true)
     expect(payload.data_source).toBe('ai_hotboard_mock_events.json')
+    expect(payload.meta).toEqual({ stale: false, partial_failures: [] })
     expect(payload.count).toBeGreaterThan(0)
     expect(payload.events[0]).toHaveProperty('event_id')
     expect(payload.events[0]).toHaveProperty('signal_score')

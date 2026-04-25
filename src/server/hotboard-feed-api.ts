@@ -23,11 +23,19 @@ type XTweet = {
 }
 
 type XSignalPayload = {
+  ok?: boolean
+  errors?: Record<string, unknown>
+  counts?: Record<string, number>
   bookmarks?: XTweet[]
   likes?: XTweet[]
   following?: XTweet[]
   for_you?: XTweet[]
   generated_at?: string
+}
+
+type FeedMeta = {
+  stale: boolean
+  partial_failures: string[]
 }
 
 type MockEvent = {
@@ -83,6 +91,7 @@ const SOURCE_MAP: Record<Exclude<XSignalSource, 'all'>, keyof XSignalPayload> = 
 }
 const SOURCE_KEYS = Object.keys(SOURCE_MAP) as Array<Exclude<XSignalSource, 'all'>>
 const DEFAULT_LIMIT = 30
+const X_SIGNAL_STALE_MS = 24 * 60 * 60 * 1000
 
 function resolveXSignalPath() {
   return process.env.HOTBOARD_X_SIGNAL_PATH || DEFAULT_X_SIGNAL_PATH
@@ -178,6 +187,25 @@ function parseXSignalPayload(raw: string): XSignalPayload | null {
   }
 }
 
+function isStaleGeneratedAt(value?: string) {
+  if (!value) return false
+  const timestamp = Date.parse(value)
+  if (Number.isNaN(timestamp)) return true
+  return Date.now() - timestamp > X_SIGNAL_STALE_MS
+}
+
+function buildXSignalMeta(parsed: XSignalPayload): FeedMeta {
+  const partialFailures = Object.keys(parsed.errors ?? {})
+  return {
+    stale: isStaleGeneratedAt(parsed.generated_at),
+    partial_failures: parsed.ok === false && partialFailures.length === 0 ? ['unknown'] : partialFailures,
+  }
+}
+
+function emptyMeta(): FeedMeta {
+  return { stale: false, partial_failures: [] }
+}
+
 function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
   const xSignalPath = resolveXSignalPath()
   if (!fs.existsSync(xSignalPath)) return null
@@ -187,7 +215,7 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
   if (!parsed) return null
 
   const build = (key: Exclude<XSignalSource, 'all'>) => {
-    const items = parsed[SOURCE_MAP[key]] ?? []
+    const items = (parsed[SOURCE_MAP[key]] ?? []) as XTweet[]
     return items.map((tweet, index) => toHotboardEvent(tweet, key, index))
   }
 
@@ -202,6 +230,7 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
     generated_at: parsed.generated_at ?? new Date().toISOString(),
     data_source: path.basename(xSignalPath),
     fallback: false,
+    meta: buildXSignalMeta(parsed),
     events: events.slice(0, limit),
   }
 }
@@ -270,6 +299,7 @@ function loadFallbackEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
     generated_at: payload.generated_at,
     data_source: 'ai_hotboard_mock_events.json',
     fallback: true,
+    meta: emptyMeta(),
     events: events.slice(0, limit),
   }
 }
@@ -297,6 +327,7 @@ export async function handleHotboardFeedGet(request: Request): Promise<Response>
     generated_at: result.generated_at,
     data_source: result.data_source,
     fallback: result.fallback,
+    meta: result.meta,
     events: result.events,
   })
 }
