@@ -107,7 +107,7 @@ describe('hotboard feed api handlers', () => {
     expect(payload.count).toBe(1)
     expect(payload.data_source).toBe('x_signal_sync_latest.json')
     expect(payload.fallback).toBe(false)
-    expect(payload.events[0]?.event_id).toBe('tweet-1')
+    expect(payload.events[0]?.event_id).toBe('x-bookmarks-self-tweet-1')
     expect(typeof payload.events[0]?.signal_score).toBe('number')
     expect(String(payload.events[0]?.summary).length).toBeLessThanOrEqual(203)
     expect(payload.events[0]?.source_line).toBe('@builder · Builder Name')
@@ -167,10 +167,50 @@ describe('hotboard feed api handlers', () => {
 
     expect(payload.count).toBe(3)
     expect(payload.events.map((item) => item.event_id)).toEqual([
-      'bookmark-new',
-      'follow-mid',
-      'like-old',
+      'x-bookmarks-self-bookmark-new',
+      'x-following-self-follow-mid',
+      'x-likes-self-like-old',
     ])
+  })
+
+  it('namespaces event_id by source and source_user to prevent vote collisions', async () => {
+    createTempFeedFile({
+      bookmarks: [
+        {
+          id: 'tweet-shared',
+          source_user: 'jc',
+          text: 'shared tweet via bookmark',
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [
+        {
+          id: 'tweet-shared',
+          source_user: 'jc',
+          text: 'shared tweet via like',
+          created_at: 'Wed Apr 16 11:00:00 +0000 2026',
+        },
+      ],
+      following: [
+        {
+          id: 'tweet-shared',
+          source_user: 'kol',
+          text: 'shared tweet via kol',
+          created_at: 'Wed Apr 16 10:00:00 +0000 2026',
+        },
+      ],
+      for_you: [],
+    })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=all'))
+    const payload = (await response.json()) as { events: Array<{ event_id: string }> }
+
+    expect(payload.events.map((item) => item.event_id)).toEqual([
+      'x-bookmarks-jc-tweet-shared',
+      'x-likes-jc-tweet-shared',
+      'x-following-kol-tweet-shared',
+    ])
+    expect(new Set(payload.events.map((item) => item.event_id)).size).toBe(3)
   })
 
   it('falls back to mock data when x feed file is missing', async () => {

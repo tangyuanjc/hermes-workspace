@@ -145,8 +145,9 @@ function toHotboardEvent(
   source: Exclude<XSignalSource, 'all'>,
   index: number,
 ): HotboardFeedEvent {
-  const fallbackId = `${source}-${index}`
-  const eventId = (tweet.id ?? '').trim() || fallbackId
+  const sourceUser = normalizeSourceUser(tweet)
+  const tweetId = (tweet.id ?? '').trim() || `idx${index}`
+  const eventId = `${source}-${sourceUser || 'self'}-${tweetId}`
   const createdAt = (tweet.created_at ?? '').trim()
   const timestampMs = parseCreatedAt(createdAt)
 
@@ -154,7 +155,7 @@ function toHotboardEvent(
     event_id: eventId,
     source,
     source_line: normalizeSourceLine(tweet),
-    source_user: normalizeSourceUser(tweet),
+    source_user: sourceUser,
     title: normalizeTitle(tweet),
     summary: truncateSummary(tweet.text ?? '') || '暂无内容',
     signal_score: inferSignalScore(tweet, source),
