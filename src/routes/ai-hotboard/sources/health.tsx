@@ -19,8 +19,11 @@ type HealthPayload = {
   sources: SourceHealthEntry[]
 }
 
-type WhoamiPayload = {
-  role?: string
+type AuthCheckPayload = {
+  authenticated?: boolean
+  user?: {
+    role?: string
+  } | null
 }
 
 const STATUS_LABELS = {
@@ -91,18 +94,18 @@ function SourceHealthRoute() {
   }, [fetchHealth])
 
   useEffect(() => {
-    async function fetchWhoami() {
+    async function fetchAuthCheck() {
       try {
-        const response = await fetch('/api/whoami')
+        const response = await fetch('/api/auth-check')
         if (!response.ok) return
-        const payload = await response.json() as WhoamiPayload
-        setIsOwner(payload.role === 'owner')
+        const payload = await response.json() as AuthCheckPayload
+        setIsOwner(Boolean(payload.authenticated && payload.user?.role === 'owner'))
       } catch {
         setIsOwner(false)
       }
     }
 
-    void fetchWhoami()
+    void fetchAuthCheck()
   }, [])
 
   const statusSummary = useMemo(() => {
