@@ -29,11 +29,73 @@ function normalizeText(value: string | null | undefined) {
   return (value ?? '').replace(/\s+/g, ' ').trim()
 }
 
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
+function textFromHtml(value: string | null | undefined) {
+  return normalizeText(decodeHtmlEntities((value ?? '').replace(/<[^>]+>/g, ' ')))
+}
+
+function parseZaraYoutubeCards(html: string): ZaraYoutubeItem[] {
+  const cardMatches = Array.from(
+    html.matchAll(/<div class="bg-white rounded-lg[\s\S]*?(?=<div class="bg-white rounded-lg|<\/div><\/div><\/div><\/div><\/div><div data-face-id=|$)/gi),
+    (match) => match[0],
+  )
+
+  const items: ZaraYoutubeItem[] = []
+  const seen = new Set<string>()
+
+  for (const card of cardMatches) {
+    const hrefMatch = card.match(/href="([^"]*youtube\.com\/watch\?v=[^"&]+[^"]*)"/i)
+    if (!hrefMatch) continue
+
+    const url = decodeHtmlEntities(hrefMatch[1])
+    const videoId = extractVideoId(url)
+    if (!videoId || seen.has(videoId)) continue
+
+    const titleMatch = card.match(/href="[^"]*youtube\.com\/watch\?v=[^"]*"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i)
+    const title = textFromHtml(titleMatch?.[1])
+    if (!title || /^watch on longcut$/i.test(title)) continue
+
+    const tagMatches = Array.from(card.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/gi), (match) =>
+      textFromHtml(match[1]),
+    ).filter(Boolean)
+
+    const afterTitle = titleMatch?.index === undefined ? card : card.slice(titleMatch.index + titleMatch[0].length)
+    const paragraphTexts = Array.from(afterTitle.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi), (match) =>
+      textFromHtml(match[1]),
+    ).filter((text) => text && !/^watch on longcut$/i.test(text))
+
+    seen.add(videoId)
+    items.push({
+      videoId,
+      url,
+      title,
+      channel: paragraphTexts[0] || undefined,
+      tags: tagMatches,
+      description: paragraphTexts[1] || undefined,
+      thumbnailUrl: buildYoutubeThumbnailUrl(url),
+    })
+  }
+
+  return items
+}
+
 export function parseZaraYoutubeHtml(html: string): ZaraYoutubeItem[] {
   const matches = Array.from(
     html.matchAll(/<article[\s\S]*?<\/article>/gi),
     (match) => match[0],
   )
+
+  if (matches.length === 0) {
+    return parseZaraYoutubeCards(html)
+  }
 
   const items: ZaraYoutubeItem[] = []
 

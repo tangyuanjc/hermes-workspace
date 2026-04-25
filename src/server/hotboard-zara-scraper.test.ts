@@ -28,7 +28,7 @@ vi.mock('playwright', () => ({
   },
 }))
 
-import { scrapeZaraYoutubeLibrary } from './hotboard-zara-scraper'
+import { parseZaraYoutubeHtml, scrapeZaraYoutubeLibrary } from './hotboard-zara-scraper'
 
 const fixturePath = path.join(
   process.cwd(),
@@ -46,6 +46,35 @@ afterEach(() => {
 })
 
 describe('hotboard zara scraper', () => {
+  it('parses current faces card markup without article tags', () => {
+    const items = parseZaraYoutubeHtml(`
+      <div class="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 flex flex-col">
+        <div class="aspect-video w-full bg-black"><iframe src="https://www.youtube.com/embed/7xTGNNLPyMI"></iframe></div>
+        <div class="flex flex-col h-full">
+          <div class="flex-grow">
+            <div class="mb-3 flex flex-wrap gap-2"><button>Fundamentals</button></div>
+            <a href="https://www.youtube.com/watch?v=7xTGNNLPyMI" target="_blank"><p><strong>Deep Dive into LLMs like ChatGPT</strong></p></a>
+            <p class="text-[#002BFF] opacity-60 font-semibold text-xs uppercase">Andrej Karpathy</p>
+            <p>The best introduction into LLMs on the Internet</p>
+          </div>
+          <a href="https://tldw.us/analyze/7xTGNNLPyMI?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D7xTGNNLPyMI"><p>Watch on LongCut</p></a>
+        </div>
+      </div>
+    `)
+
+    expect(items).toEqual([
+      {
+        videoId: '7xTGNNLPyMI',
+        url: 'https://www.youtube.com/watch?v=7xTGNNLPyMI',
+        title: 'Deep Dive into LLMs like ChatGPT',
+        channel: 'Andrej Karpathy',
+        tags: ['Fundamentals'],
+        description: 'The best introduction into LLMs on the Internet',
+        thumbnailUrl: 'https://i.ytimg.com/vi/7xTGNNLPyMI/hqdefault.jpg',
+      },
+    ])
+  })
+
   it('parses youtube cards from hydrated library html and expands the collection first', async () => {
     const click = vi.fn(async () => undefined)
     mockState.page.getByRole.mockReturnValue({ click })
