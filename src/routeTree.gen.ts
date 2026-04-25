@@ -72,6 +72,7 @@ import { Route as AiHotboardLogoutRouteImport } from './routes/ai-hotboard/logou
 import { Route as AiHotboardIterationRouteImport } from './routes/ai-hotboard/iteration'
 import { Route as AuthFeishuCallbackRouteImport } from './routes/auth/feishu/callback'
 import { Route as AuthEmailVerifyRouteImport } from './routes/auth/email/verify'
+import { Route as ApiSourcesHealthRouteImport } from './routes/api/sources/health'
 import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
 import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
@@ -437,6 +438,11 @@ const AuthFeishuCallbackRoute = AuthFeishuCallbackRouteImport.update({
 const AuthEmailVerifyRoute = AuthEmailVerifyRouteImport.update({
   id: '/auth/email/verify',
   path: '/auth/email/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSourcesHealthRoute = ApiSourcesHealthRouteImport.update({
+  id: '/api/sources/health',
+  path: '/api/sources/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
@@ -807,6 +813,7 @@ export interface FileRoutesByFullPath {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/sources/health': typeof ApiSourcesHealthRoute
   '/auth/email/verify': typeof AuthEmailVerifyRoute
   '/auth/feishu/callback': typeof AuthFeishuCallbackRoute
   '/api/hotboard/vote/aggregate': typeof ApiHotboardVoteAggregateRoute
@@ -921,6 +928,7 @@ export interface FileRoutesByTo {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/sources/health': typeof ApiSourcesHealthRoute
   '/auth/email/verify': typeof AuthEmailVerifyRoute
   '/auth/feishu/callback': typeof AuthFeishuCallbackRoute
   '/api/hotboard/vote/aggregate': typeof ApiHotboardVoteAggregateRoute
@@ -1038,6 +1046,7 @@ export interface FileRoutesById {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
+  '/api/sources/health': typeof ApiSourcesHealthRoute
   '/auth/email/verify': typeof AuthEmailVerifyRoute
   '/auth/feishu/callback': typeof AuthFeishuCallbackRoute
   '/api/hotboard/vote/aggregate': typeof ApiHotboardVoteAggregateRoute
@@ -1156,6 +1165,7 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/sources/health'
     | '/auth/email/verify'
     | '/auth/feishu/callback'
     | '/api/hotboard/vote/aggregate'
@@ -1270,6 +1280,7 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/sources/health'
     | '/auth/email/verify'
     | '/auth/feishu/callback'
     | '/api/hotboard/vote/aggregate'
@@ -1386,6 +1397,7 @@ export interface FileRouteTypes {
     | '/api/skills/install'
     | '/api/skills/toggle'
     | '/api/skills/uninstall'
+    | '/api/sources/health'
     | '/auth/email/verify'
     | '/auth/feishu/callback'
     | '/api/hotboard/vote/aggregate'
@@ -1474,6 +1486,7 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
+  ApiSourcesHealthRoute: typeof ApiSourcesHealthRoute
   AuthEmailVerifyRoute: typeof AuthEmailVerifyRoute
   AuthFeishuCallbackRoute: typeof AuthFeishuCallbackRoute
   ApiHotboardWechatFeedRoute: typeof ApiHotboardWechatFeedRoute
@@ -1923,6 +1936,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/email/verify'
       fullPath: '/auth/email/verify'
       preLoaderRoute: typeof AuthEmailVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sources/health': {
+      id: '/api/sources/health'
+      path: '/api/sources/health'
+      fullPath: '/api/sources/health'
+      preLoaderRoute: typeof ApiSourcesHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/skills/uninstall': {
@@ -2515,6 +2535,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
+  ApiSourcesHealthRoute: ApiSourcesHealthRoute,
   AuthEmailVerifyRoute: AuthEmailVerifyRoute,
   AuthFeishuCallbackRoute: AuthFeishuCallbackRoute,
   ApiHotboardWechatFeedRoute: ApiHotboardWechatFeedRoute,
