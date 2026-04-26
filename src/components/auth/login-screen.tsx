@@ -186,6 +186,8 @@ export function LoginScreen() {
             {authError ? (
               <div
                 className={`${LOGIN_TOAST_CLASS} border-red-300/20 text-red-300 ring-1 ring-red-300/10`}
+                role="alert"
+                aria-live="polite"
               >
                 {errorText}
               </div>
@@ -207,6 +209,7 @@ export function LoginScreen() {
                     clearMessages()
                   }}
                   placeholder="用户名（例如 paopao）"
+                  aria-label="用户名"
                   className={LOGIN_INPUT_CLASS}
                   autoComplete="username"
                   autoCapitalize="off"
@@ -221,11 +224,13 @@ export function LoginScreen() {
                     clearMessages()
                   }}
                   placeholder="密码"
+                  aria-label="密码"
                   className={LOGIN_INPUT_CLASS}
                   autoComplete="current-password"
                 />
                 <button
                   type="submit"
+                  aria-label="使用用户名和密码登录"
                   disabled={submitting}
                   className={LOGIN_BUTTON_CLASS}
                 >
@@ -242,11 +247,13 @@ export function LoginScreen() {
                     clearMessages()
                   }}
                   placeholder="you@example.com"
+                  aria-label="邮箱"
                   className={LOGIN_INPUT_CLASS}
                   autoComplete="email"
                 />
                 <button
                   type="button"
+                  aria-label="发送邮箱登录链接"
                   onClick={() => {
                     void submitEmailMagicLink()
                   }}
@@ -261,6 +268,8 @@ export function LoginScreen() {
             {requestError ? (
               <div
                 className={`${LOGIN_TOAST_CLASS} border-red-300/20 text-red-300 ring-1 ring-red-300/10`}
+                role="alert"
+                aria-live="polite"
               >
                 {requestError}
               </div>
@@ -269,6 +278,8 @@ export function LoginScreen() {
             {requestSuccess ? (
               <div
                 className={`${LOGIN_TOAST_CLASS} border-emerald-300/20 text-emerald-300 ring-1 ring-emerald-300/10`}
+                role="alert"
+                aria-live="polite"
               >
                 {requestSuccess}
               </div>
