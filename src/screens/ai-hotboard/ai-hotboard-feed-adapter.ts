@@ -163,6 +163,34 @@ export function buildFallbackEventsFromMock(source: string, events: MockEvent[])
   }))
 }
 
+export function buildFeedFallbackPayload({
+  isDev,
+  source,
+  generatedAt,
+  note,
+  events,
+}: {
+  isDev: boolean
+  source: string
+  generatedAt: string
+  note: string
+  events: MockEvent[]
+}) {
+  if (!isDev) {
+    return {
+      generated_at: new Date().toISOString(),
+      note: 'empty-feed',
+      events: [],
+    }
+  }
+
+  return {
+    generated_at: generatedAt,
+    note,
+    events: buildFallbackEventsFromMock(source, events),
+  }
+}
+
 export function normalizeTimelineTimestamp(timestamp: string) {
   const trimmed = timestamp.trim()
   const match = trimmed.match(/^(\d{1,2}):(\d{1,2})$/)

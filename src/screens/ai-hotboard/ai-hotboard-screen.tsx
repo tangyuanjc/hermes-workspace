@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { fetchHermesAuthStatus, type AuthUser } from '@/lib/hermes-auth'
 import hotboardData from './ai_hotboard_mock_events.json'
 import {
-  buildFallbackEventsFromMock,
+  buildFeedFallbackPayload,
   mapFeedEventToMockEvent,
   normalizeTimelineTimestamp,
   parseGeneratedAtValue,
@@ -1672,13 +1672,16 @@ export function AiHotboardScreen({
       }
 
       if (!cancelled) {
-        setRemotePayload({
-          generated_at: payload.generated_at,
+        const fallbackPayload = buildFeedFallbackPayload({
+          isDev: import.meta.env.DEV === true,
+          source: normalizedSource,
+          generatedAt: payload.generated_at,
           note: payload.note,
-          events: buildFallbackEventsFromMock(normalizedSource, payload.events),
+          events: payload.events,
         })
+        setRemotePayload(fallbackPayload)
         setRemoteSourceLabel(DATA_SOURCE_LABEL)
-        setRemoteGeneratedAt(payload.generated_at)
+        setRemoteGeneratedAt(fallbackPayload.generated_at)
         setFeedMeta(EMPTY_FEED_META)
       }
     }
@@ -2184,6 +2187,18 @@ export function AiHotboardScreen({
   const renderMainPanel = () => {
     if (isPlaceholderSourcePage(effectivePage)) {
       return <JcHumanTalksComingSoonCard />
+    }
+
+    if (isFeedPage(effectivePage) && timelineGroups.length === 0) {
+      return (
+        <FriendlyEmptyState
+          icon={AiSearchIcon}
+          title="暂无信号 · 信源加载中或本期为空"
+          description="当前没有可展示的真实信号。请稍后刷新，或检查 X / 公众号 / Zara 等信源同步状态。"
+          ctaLabel="查看信源健康"
+          ctaTo="/ai-hotboard/sources/health"
+        />
+      )
     }
 
     if (effectivePage === 'intake-hermes' || effectivePage === 'intake-xiaoj') {

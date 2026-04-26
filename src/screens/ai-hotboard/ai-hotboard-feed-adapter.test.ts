@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapFeedEventToMockEvent, toSupportedHotboardSource } from './ai-hotboard-feed-adapter'
+import { buildFeedFallbackPayload, mapFeedEventToMockEvent, toSupportedHotboardSource } from './ai-hotboard-feed-adapter'
 
 describe('ai hotboard feed adapter', () => {
   it('maps x feed payload into mock-event compatible shape', () => {
@@ -47,5 +47,34 @@ describe('ai hotboard feed adapter', () => {
     expect(toSupportedHotboardSource('x-for_you')).toBe('x-for_you')
     expect(toSupportedHotboardSource('wechat')).toBe('wechat')
     expect(toSupportedHotboardSource('bad-source')).toBe('all')
+  })
+
+  it('hides mock fallback events outside dev mode', () => {
+    const fallback = buildFeedFallbackPayload({
+      isDev: false,
+      source: 'all',
+      generatedAt: '2026-04-16T00:00:00.000Z',
+      note: 'mock',
+      events: [
+        {
+          id: 'mock-1',
+          timestamp: '10:00',
+          source_type: 'X',
+          source_name: 'mock',
+          source_channel: 'x-bookmarks',
+          title: 'mock item',
+          summary: 'mock summary',
+          tags: [],
+          signal_category: 'other',
+          aggregated_sources_count: 0,
+          engagement: { likes: 1, dislikes: 0, bookmarks: 0 },
+          recommend_reason: '',
+          suggested_action: '',
+        },
+      ],
+    })
+
+    expect(fallback.events).toEqual([])
+    expect(fallback.note).toBe('empty-feed')
   })
 })
