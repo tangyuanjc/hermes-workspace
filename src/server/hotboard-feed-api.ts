@@ -134,18 +134,22 @@ function lowFollowerProxyScore(event: HotboardFeedEvent) {
   return (event.replies + event.retweets) / Math.max(event.likes, 1)
 }
 
+function percentile(values: number[], percentileRank: number) {
+  if (values.length === 0) return 0
+  const sorted = values.slice().sort((a, b) => a - b)
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentileRank) - 1))
+  return sorted[index] ?? 0
+}
+
 export function lowFollowerFilter(events: HotboardFeedEvent[]): HotboardFeedEvent[] {
-  return events
-    .filter((event) => event.replies + event.retweets > event.likes * 5)
-    .map((event) => {
-      const proxyScore = lowFollowerProxyScore(event)
-      return {
-        ...event,
-        title: event.title.startsWith('🔥 低粉爆款') ? event.title : `🔥 低粉爆款 (估算) · ${event.title}`,
-        signal_score: Math.max(event.signal_score, Math.min(99, Math.round(80 + proxyScore))),
-      }
-    })
-    .sort((a, b) => lowFollowerProxyScore(b) - lowFollowerProxyScore(a))
+  const eligible = events.filter(
+    (event) => event.likes + event.retweets >= 30 && event.replies + event.retweets > event.likes * 5,
+  )
+  const cap = percentile(eligible.map(lowFollowerProxyScore), 0.95)
+
+  return eligible.sort(
+    (a, b) => Math.min(lowFollowerProxyScore(b), cap) - Math.min(lowFollowerProxyScore(a), cap),
+  )
 }
 
 function normalizeSourceLine(tweet: XTweet) {

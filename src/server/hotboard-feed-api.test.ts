@@ -104,6 +104,22 @@ describe('hotboard feed api handlers', () => {
         timestamp_ms: 900,
       },
       {
+        event_id: 'low-volume-noise',
+        source: 'x-for_you',
+        source_line: '@tiny · Tiny Account',
+        source_user: 'jc',
+        title: 'low volume noise',
+        summary: 'low volume noise',
+        signal_score: 88,
+        likes: 1,
+        retweets: 20,
+        views: 100,
+        replies: 10,
+        created_at: 'Wed Apr 16 12:30:00 +0000 2026',
+        url: '',
+        timestamp_ms: 1100,
+      },
+      {
         event_id: 'popular-not-proxy',
         source: 'x-likes',
         source_line: '@big · Big Account',
@@ -122,7 +138,40 @@ describe('hotboard feed api handlers', () => {
     ])
 
     expect(filtered.map((event) => event.event_id)).toEqual(['viral-high-ratio', 'viral-lower-ratio'])
-    expect(filtered[0]?.signal_score).toBeGreaterThan(filtered[1]?.signal_score ?? 0)
+    expect(filtered[0]?.title).toBe('viral high ratio')
+    expect(filtered[0]?.signal_score).toBe(88)
+  })
+
+  it('winsorizes low-follower proxy sorting at the 95th percentile', () => {
+    const events = Array.from({ length: 20 }, (_, index) => ({
+      event_id: `baseline-${index}`,
+      source: 'x-for_you' as const,
+      source_line: '@small · Small Account',
+      source_user: 'jc',
+      title: `baseline ${index}`,
+      summary: `baseline ${index}`,
+      signal_score: 80,
+      likes: 5,
+      retweets: 30 + index,
+      views: 1000,
+      replies: 0,
+      created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+      url: '',
+      timestamp_ms: 1000 - index,
+    }))
+    const extreme = {
+      ...events[0],
+      event_id: 'extreme-low-like',
+      title: 'extreme low like',
+      likes: 1,
+      retweets: 1000,
+      timestamp_ms: 2000,
+    }
+
+    const filtered = lowFollowerFilter([...events, extreme])
+
+    expect(filtered[0]?.event_id).not.toBe('extreme-low-like')
+    expect(filtered.map((event) => event.event_id)).toContain('extreme-low-like')
   })
 
   it('returns low-follower proxy feed from all X sources', async () => {
@@ -159,7 +208,7 @@ describe('hotboard feed api handlers', () => {
 
     expect(payload.source).toBe('low-follower')
     expect(payload.events.map((event) => event.event_id)).toEqual(['x-bookmarks-self-bookmark-viral'])
-    expect(payload.events[0]?.title).toContain('低粉爆款')
+    expect(payload.events[0]?.title).toBe('bookmark viral proxy')
   })
 
   it('returns transformed x feed cards for source=x-bookmarks', async () => {

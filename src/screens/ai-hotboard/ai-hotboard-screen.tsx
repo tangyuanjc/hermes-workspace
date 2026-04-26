@@ -203,7 +203,7 @@ export const STRATEGY_ITERATION_ITEMS = [
 const PRIMARY_NAV_ITEMS = [
   { key: 'featured', label: '精选', to: '/ai-hotboard' },
   { key: 'view-all', label: '全部 AI 动态', to: '/ai-hotboard/view/all' },
-  { key: 'view-low-follower', label: '低粉爆文', to: '/ai-hotboard/view/low-follower' },
+  { key: 'view-low-follower', label: '热议帖 (估算)', to: '/ai-hotboard/view/low-follower' },
   { key: 'view-bookmarks', label: '收藏', to: '/ai-hotboard/view/bookmarks' },
 ] as const
 
@@ -428,8 +428,8 @@ function getFeedHeading(page: AiHotboardPage) {
 
   if (page === 'view-low-follower') {
     return {
-      title: '低粉爆文',
-      subtitle: '优先关注低粉账号的高传播信号',
+      title: '热议帖 (估算)',
+      subtitle: '互动比偏高的代理热点 · follower 数据待接入',
     }
   }
 
@@ -624,7 +624,7 @@ function FriendlyEmptyState({
   )
 }
 
-function feedMatchesMode(
+export function feedMatchesMode(
   event: TimelineEvent,
   mode: FeedMode,
   voteAggregateByEvent: VoteAggregateByEvent,
@@ -632,7 +632,7 @@ function feedMatchesMode(
   if (mode === 'all') return true
 
   if (mode === 'low-follower') {
-    return event.engagement.likes >= 30 && event.engagement.likes <= 280
+    return true
   }
 
   if (mode === 'bookmarks') {

@@ -9,6 +9,7 @@ import {
   buildFeedStats,
   FeedMetaBanners,
   FeedTimeline,
+  feedMatchesMode,
   JcHumanTalksComingSoonCard,
   normalizeFeedMeta,
   RECOMMEND_BANNER_CLASS,
@@ -70,7 +71,7 @@ describe('ai-hotboard screen handoff constraints', () => {
     expect(SIDEBAR_NAV_SEQUENCE).toEqual([
       '精选',
       '全部 AI 动态',
-      '低粉爆文',
+      '热议帖 (估算)',
       '收藏',
       '信源',
       '信源提报',
@@ -141,6 +142,16 @@ describe('FeedTimeline source user pill', () => {
 describe('resolveFeedSourceForPage', () => {
   it('routes low-follower view to the server-side proxy filter', () => {
     expect(resolveFeedSourceForPage('view-low-follower', 'all')).toBe('low-follower')
+  })
+
+  it('does not client-filter server low-follower results by like count', () => {
+    expect(
+      feedMatchesMode(
+        makeTimelineEvent({ id: 'evt-server-low-follower', engagement: { likes: 999, dislikes: 0, bookmarks: 0 } }),
+        'low-follower',
+        {},
+      ),
+    ).toBe(true)
   })
 })
 
