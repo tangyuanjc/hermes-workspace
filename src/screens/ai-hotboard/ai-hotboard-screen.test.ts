@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { createElement } from 'react'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import {
@@ -174,6 +177,17 @@ describe('FeedMetaBanners', () => {
     expect(screen.getByText('⏰ 数据不新鲜,距上次成功同步超过 24 小时')).toBeTruthy()
 
     cleanup()
+  })
+})
+
+describe('mock feed loading', () => {
+  it('keeps mock JSON behind a lazy dev fallback import', () => {
+    const sourcePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ai-hotboard-screen.tsx')
+    const source = fs.readFileSync(sourcePath, 'utf-8')
+
+    expect(source).not.toContain("import hotboardData from './ai_hotboard_mock_events.json'")
+    expect(source).not.toContain("await import('./ai_hotboard_mock_events.json')")
+    expect(source).toContain('await import(/* @vite-ignore */ `./${DATA_SOURCE_LABEL}`)')
   })
 })
 

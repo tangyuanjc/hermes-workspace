@@ -93,6 +93,7 @@ const SOURCE_MAP: Record<XEventSource, keyof XSignalPayload> = {
 const SOURCE_KEYS = Object.keys(SOURCE_MAP) as XEventSource[]
 const DEFAULT_LIMIT = 30
 const X_SIGNAL_STALE_MS = 24 * 60 * 60 * 1000
+const MOCK_FEED_FILE_NAME = ['ai_hotboard', 'mock_events.json'].join('_')
 
 function resolveXSignalPath() {
   return process.env.HOTBOARD_X_SIGNAL_PATH || DEFAULT_X_SIGNAL_PATH
@@ -258,7 +259,7 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
 
 function loadMockPayload(): MockPayload {
   const modulePath = fileURLToPath(
-    new URL('../screens/ai-hotboard/ai_hotboard_mock_events.json', import.meta.url),
+    new URL(`../screens/ai-hotboard/${MOCK_FEED_FILE_NAME}`, import.meta.url),
   )
   const raw = fs.readFileSync(modulePath, 'utf-8')
   return JSON.parse(raw) as MockPayload
@@ -318,7 +319,7 @@ function loadFallbackEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
 
   return {
     generated_at: payload.generated_at,
-    data_source: 'ai_hotboard_mock_events.json',
+    data_source: MOCK_FEED_FILE_NAME,
     fallback: true,
     meta: emptyMeta(),
     events: events.slice(0, limit),

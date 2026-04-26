@@ -13,7 +13,6 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { cn } from '@/lib/utils'
 import { fetchHermesAuthStatus, type AuthUser } from '@/lib/hermes-auth'
-import hotboardData from './ai_hotboard_mock_events.json'
 import {
   buildFeedFallbackPayload,
   mapFeedEventToMockEvent,
@@ -36,6 +35,12 @@ type MockPayload = {
   events: MockEvent[]
 }
 
+const EMPTY_MOCK_PAYLOAD: MockPayload = {
+  generated_at: new Date(0).toISOString(),
+  note: 'empty-feed',
+  events: [],
+}
+
 type FeedMeta = {
   stale: boolean
   partial_failures: string[]
@@ -55,8 +60,7 @@ type TimelineGroup = {
   events: TimelineEvent[]
 }
 
-const payload = hotboardData as MockPayload
-const DATA_SOURCE_LABEL = 'ai_hotboard_mock_events.json'
+const DATA_SOURCE_LABEL = ['ai_hotboard', 'mock_events.json'].join('_')
 const EMPTY_FEED_META: FeedMeta = { stale: false, partial_failures: [] }
 
 export function normalizeFeedMeta(meta?: Partial<FeedMeta>): FeedMeta {
@@ -1470,9 +1474,9 @@ export function AiHotboardScreen({
   const [authRequired, setAuthRequired] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
-  const [remotePayload, setRemotePayload] = useState<MockPayload>(payload)
+  const [remotePayload, setRemotePayload] = useState<MockPayload>(EMPTY_MOCK_PAYLOAD)
   const [remoteSourceLabel, setRemoteSourceLabel] = useState(DATA_SOURCE_LABEL)
-  const [remoteGeneratedAt, setRemoteGeneratedAt] = useState(payload.generated_at)
+  const [remoteGeneratedAt, setRemoteGeneratedAt] = useState(EMPTY_MOCK_PAYLOAD.generated_at)
   const [feedMeta, setFeedMeta] = useState<FeedMeta>(EMPTY_FEED_META)
   const [voteAggregateByEvent, setVoteAggregateByEvent] = useState<VoteAggregateByEvent>({})
 
@@ -1677,12 +1681,16 @@ export function AiHotboardScreen({
       }
 
       if (!cancelled) {
+        const fallbackPayloadSource =
+          import.meta.env.DEV === true
+            ? ((await import(/* @vite-ignore */ `./${DATA_SOURCE_LABEL}`)).default as MockPayload)
+            : EMPTY_MOCK_PAYLOAD
         const fallbackPayload = buildFeedFallbackPayload({
           isDev: import.meta.env.DEV === true,
           source: normalizedSource,
-          generatedAt: payload.generated_at,
-          note: payload.note,
-          events: payload.events,
+          generatedAt: fallbackPayloadSource.generated_at,
+          note: fallbackPayloadSource.note,
+          events: fallbackPayloadSource.events,
         })
         setRemotePayload(fallbackPayload)
         setRemoteSourceLabel(DATA_SOURCE_LABEL)
