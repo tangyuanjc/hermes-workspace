@@ -59,6 +59,15 @@ const payload = hotboardData as MockPayload
 const DATA_SOURCE_LABEL = 'ai_hotboard_mock_events.json'
 const EMPTY_FEED_META: FeedMeta = { stale: false, partial_failures: [] }
 
+export function normalizeFeedMeta(meta?: Partial<FeedMeta>): FeedMeta {
+  return {
+    stale: meta?.stale === true,
+    partial_failures: Array.isArray(meta?.partial_failures)
+      ? meta.partial_failures.map((item) => String(item))
+      : [],
+  }
+}
+
 export type VoteType = 'like' | 'dislike' | 'bookmark'
 
 export type VoteAggregateEntry = {
@@ -1651,6 +1660,8 @@ export function AiHotboardScreen({
 
         if (cancelled) return
 
+        setFeedMeta(normalizeFeedMeta(body.meta))
+
         if (normalizedEvents.length > 0) {
           setRemotePayload({
             generated_at: String(body.generated_at ?? new Date().toISOString()),
@@ -1659,12 +1670,6 @@ export function AiHotboardScreen({
           })
           setRemoteSourceLabel(String(body.data_source ?? DATA_SOURCE_LABEL))
           setRemoteGeneratedAt(String(body.generated_at ?? new Date().toISOString()))
-          setFeedMeta({
-            stale: body.meta?.stale === true,
-            partial_failures: Array.isArray(body.meta?.partial_failures)
-              ? body.meta.partial_failures.map((item) => String(item))
-              : [],
-          })
           return
         }
       } catch {

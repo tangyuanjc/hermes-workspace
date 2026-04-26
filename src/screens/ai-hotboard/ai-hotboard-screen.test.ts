@@ -7,6 +7,7 @@ import {
   FeedMetaBanners,
   FeedTimeline,
   JcHumanTalksComingSoonCard,
+  normalizeFeedMeta,
   RECOMMEND_BANNER_CLASS,
   resolveFeedSourceForPage,
   SIDEBAR_NAV_SEQUENCE,
@@ -154,6 +155,18 @@ describe('JcHumanTalksComingSoonCard', () => {
 })
 
 describe('FeedMetaBanners', () => {
+  it('renders feed meta from an empty events response', () => {
+    const response = { events: [], meta: { stale: true, partial_failures: ['x:bookmarks'] } }
+
+    render(createElement(FeedMetaBanners, { meta: normalizeFeedMeta(response.meta) }))
+
+    expect(response.events).toHaveLength(0)
+    expect(screen.getByText('🟡 部分信号源同步异常: x:bookmarks')).toBeTruthy()
+    expect(screen.getByText('⏰ 数据不新鲜,距上次成功同步超过 24 小时')).toBeTruthy()
+
+    cleanup()
+  })
+
   it('surfaces partial failures and stale feed state', () => {
     render(createElement(FeedMetaBanners, { meta: { stale: true, partial_failures: ['jc:bookmarks', 'x:likes'] } }))
 
