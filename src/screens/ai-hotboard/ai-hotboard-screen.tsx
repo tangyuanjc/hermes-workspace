@@ -794,6 +794,17 @@ function V2PlaceholderPanel({
   )
 }
 
+export function JcHumanTalksComingSoonCard() {
+  return (
+    <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+      <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>COMING SOON</div>
+      <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>JC 的人类对谈</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-300">JC 与同行/朋友的高密度对谈精选片段,目前由 JC 手工从飞书妙记挑选。</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400/80">第一批预计 W19 (2026-05) 上线,4-6 段 5-15 分钟精华。</p>
+    </section>
+  )
+}
+
 function StrategyPanel({
   strategyLine,
   item,
@@ -2136,17 +2147,7 @@ export function AiHotboardScreen({
 
   const renderMainPanel = () => {
     if (isPlaceholderSourcePage(effectivePage)) {
-      const placeholderMeta = SOURCE_PLACEHOLDER_ROUTE_ITEMS.find((item) => `source-${item.key}` === effectivePage)
-      if (!placeholderMeta) return null
-
-      return (
-        <V2PlaceholderPanel
-          title={`信源 · ${placeholderMeta.label}`}
-          expectedWeek={placeholderMeta.expectedWeek}
-          owner={placeholderMeta.owner}
-          dataSource={placeholderMeta.dataSource}
-        />
-      )
+      return <JcHumanTalksComingSoonCard />
     }
 
     if (effectivePage === 'intake-hermes' || effectivePage === 'intake-xiaoj') {

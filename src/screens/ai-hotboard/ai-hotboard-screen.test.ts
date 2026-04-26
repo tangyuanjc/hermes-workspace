@@ -5,6 +5,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import {
   buildFeedStats,
   FeedTimeline,
+  JcHumanTalksComingSoonCard,
   RECOMMEND_BANNER_CLASS,
   resolveFeedSourceForPage,
   SIDEBAR_NAV_SEQUENCE,
@@ -135,6 +136,22 @@ describe('FeedTimeline source user pill', () => {
 describe('resolveFeedSourceForPage', () => {
   it('routes low-follower view to the server-side proxy filter', () => {
     expect(resolveFeedSourceForPage('view-low-follower', 'all')).toBe('low-follower')
+  })
+})
+
+describe('JcHumanTalksComingSoonCard', () => {
+  it('renders the W19 coming-soon copy instead of generic placeholder metadata', () => {
+    render(createElement(JcHumanTalksComingSoonCard))
+
+    expect(screen.getByText('COMING SOON')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'JC 的人类对谈' })).toBeTruthy()
+    expect(screen.getByText(/第一批预计 W19 \(2026-05\) 上线/)).toBeTruthy()
+    expect(screen.queryByText(/V2 SLOT/)).toBeNull()
+
+    cleanup()
+  })
+})
+
   })
 })
 
