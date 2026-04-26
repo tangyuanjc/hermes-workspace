@@ -13,37 +13,16 @@ export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        // Gateway probe is best-effort metadata, NOT auth gating.
+        // ai-hotboard auth uses local SQLite session store independent of
+        // hermes-agent HTTP gateway. If gateway is down, login still works.
+        let hermesGatewayReachable = false
         try {
-          // Use ensureGatewayProbed() which handles auto-detection across
-          // multiple ports (8642, 8643) instead of checking a single
-          // hardcoded URL. This was previously a standalone
-          // isBackendReachable() that only tried port 8642 and never
-          // benefited from the gateway-capabilities auto-detection logic.
           const caps = await ensureGatewayProbed()
-          const reachable = caps.health || caps.chatCompletions || caps.models
-
-          if (!reachable) {
-            return json(
-              {
-                authenticated: false,
-                authRequired: false,
-                error: 'hermes_agent_unreachable',
-              },
-              { status: 503 },
-            )
-          }
-        } catch (error) {
-          return json(
-            {
-              authenticated: false,
-              authRequired: false,
-              error:
-                error instanceof DOMException && error.name === 'AbortError'
-                  ? 'hermes_agent_timeout'
-                  : 'hermes_agent_unreachable',
-            },
-            { status: 503 },
-          )
+          hermesGatewayReachable =
+            caps.health || caps.chatCompletions || caps.models
+        } catch {
+          hermesGatewayReachable = false
         }
 
         const authRequired =
@@ -65,6 +44,7 @@ export const Route = createFileRoute('/api/auth-check')({
           authenticated,
           authRequired,
           authMode,
+          hermesGatewayReachable,
           user: user
             ? {
                 id: user.id,

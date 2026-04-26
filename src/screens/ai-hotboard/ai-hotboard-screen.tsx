@@ -1842,7 +1842,7 @@ export function AiHotboardScreen({
         method: 'POST',
       })
     } finally {
-      window.location.href = '/ai-hotboard/logout'
+      window.location.href = '/ai-hotboard'
     }
   }
 
