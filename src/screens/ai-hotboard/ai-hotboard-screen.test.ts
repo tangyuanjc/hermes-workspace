@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import {
   buildFeedStats,
+  FeedErrorBanners,
   FeedMetaBanners,
   FeedTimeline,
   feedMatchesMode,
@@ -188,6 +189,19 @@ describe('FeedMetaBanners', () => {
 
     expect(screen.getByText('🟡 部分信号源同步异常: jc:bookmarks, x:likes')).toBeTruthy()
     expect(screen.getByText('⏰ 数据不新鲜,距上次成功同步超过 24 小时')).toBeTruthy()
+
+    cleanup()
+  })
+})
+
+describe('FeedErrorBanners', () => {
+  it('surfaces auth-check and feed-fetch failures without exposing raw errors', () => {
+    render(createElement(FeedErrorBanners, { authCheckError: 'HTTP 500', feedFetchError: 'network down' }))
+
+    expect(screen.getByText('身份核验失败 - 请刷新或联系 JC')).toBeTruthy()
+    expect(screen.getByText('数据加载失败 - 请刷新或联系 JC')).toBeTruthy()
+    expect(screen.queryByText('HTTP 500')).toBeNull()
+    expect(screen.queryByText('network down')).toBeNull()
 
     cleanup()
   })

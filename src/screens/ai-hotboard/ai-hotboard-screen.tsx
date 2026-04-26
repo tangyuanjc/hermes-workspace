@@ -824,6 +824,25 @@ export function JcHumanTalksComingSoonCard() {
   )
 }
 
+export function FeedErrorBanners({ authCheckError, feedFetchError }: { authCheckError: string | null; feedFetchError: string | null }) {
+  if (!authCheckError && !feedFetchError) return null
+
+  return (
+    <div className="space-y-3">
+      {authCheckError ? (
+        <div className="rounded-lg border border-red-300/30 bg-red-400/8 px-4 py-3 text-sm text-red-200/90">
+          身份核验失败 - 请刷新或联系 JC
+        </div>
+      ) : null}
+      {feedFetchError ? (
+        <div className="rounded-lg border border-red-300/30 bg-red-400/8 px-4 py-3 text-sm text-red-200/90">
+          数据加载失败 - 请刷新或联系 JC
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
   const hasPartialFailures = meta.partial_failures.length > 0
 
@@ -1472,12 +1491,14 @@ export function AiHotboardScreen({
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [authResolved, setAuthResolved] = useState(false)
   const [authRequired, setAuthRequired] = useState(false)
+  const [authCheckError, setAuthCheckError] = useState<string | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const [remotePayload, setRemotePayload] = useState<MockPayload>(EMPTY_MOCK_PAYLOAD)
   const [remoteSourceLabel, setRemoteSourceLabel] = useState(DATA_SOURCE_LABEL)
   const [remoteGeneratedAt, setRemoteGeneratedAt] = useState(EMPTY_MOCK_PAYLOAD.generated_at)
   const [feedMeta, setFeedMeta] = useState<FeedMeta>(EMPTY_FEED_META)
+  const [feedFetchError, setFeedFetchError] = useState<string | null>(null)
   const [voteAggregateByEvent, setVoteAggregateByEvent] = useState<VoteAggregateByEvent>({})
 
   const [intakeItemsByAgent, setIntakeItemsByAgent] = useState<Record<IntakeAgentKey, IntakeItem[]>>({
@@ -1645,6 +1666,7 @@ export function AiHotboardScreen({
       }
 
       try {
+        setFeedFetchError(null)
         const response = await fetch(
           `/api/hotboard/feed?source=${encodeURIComponent(normalizedSource)}`,
         )
@@ -1676,7 +1698,11 @@ export function AiHotboardScreen({
           setRemoteGeneratedAt(String(body.generated_at ?? new Date().toISOString()))
           return
         }
-      } catch {
+      } catch (error) {
+        console.error('[ai-hotboard] feed-fetch failed', error)
+        if (!cancelled) {
+          setFeedFetchError(error instanceof Error ? error.message : 'feed request failed')
+        }
         // Keep fallback payload when feed API fails.
       }
 
@@ -1758,6 +1784,7 @@ export function AiHotboardScreen({
 
     async function loadAuthUser() {
       try {
+        setAuthCheckError(null)
         const auth = await fetchHermesAuthStatus()
         if (cancelled) return
 
@@ -1768,10 +1795,12 @@ export function AiHotboardScreen({
         } else {
           setAuthUser(null)
         }
-      } catch {
+      } catch (error) {
+        console.error('[ai-hotboard] auth-check failed', error)
         if (!cancelled) {
           setAuthRequired(false)
           setAuthUser(null)
+          setAuthCheckError(error instanceof Error ? error.message : 'auth check failed')
         }
       } finally {
         if (!cancelled) {
@@ -2368,6 +2397,8 @@ export function AiHotboardScreen({
             tone="cyan"
           />
         </section>
+
+        <FeedErrorBanners authCheckError={authCheckError} feedFetchError={feedFetchError} />
 
         <FeedMetaBanners meta={feedMeta} />
 
