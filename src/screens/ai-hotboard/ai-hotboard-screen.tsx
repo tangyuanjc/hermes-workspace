@@ -36,6 +36,11 @@ type MockPayload = {
   events: MockEvent[]
 }
 
+type FeedMeta = {
+  stale: boolean
+  partial_failures: string[]
+}
+
 export type TimelineEvent = MockEvent & {
   id: string
   signalScore: number
@@ -52,6 +57,7 @@ type TimelineGroup = {
 
 const payload = hotboardData as MockPayload
 const DATA_SOURCE_LABEL = 'ai_hotboard_mock_events.json'
+const EMPTY_FEED_META: FeedMeta = { stale: false, partial_failures: [] }
 
 export type VoteType = 'like' | 'dislike' | 'bookmark'
 
@@ -805,6 +811,27 @@ export function JcHumanTalksComingSoonCard() {
   )
 }
 
+export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
+  const hasPartialFailures = meta.partial_failures.length > 0
+
+  if (!hasPartialFailures && !meta.stale) return null
+
+  return (
+    <div className="space-y-3">
+      {hasPartialFailures ? (
+        <div className="rounded-lg border border-amber-300/30 bg-amber-400/8 px-4 py-3 text-sm text-amber-200/90">
+          🟡 部分信号源同步异常: {meta.partial_failures.join(', ')}
+        </div>
+      ) : null}
+      {meta.stale ? (
+        <div className="rounded-lg border border-slate-300/20 bg-slate-700/30 px-4 py-3 text-sm text-slate-300/80">
+          ⏰ 数据不新鲜,距上次成功同步超过 24 小时
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function StrategyPanel({
   strategyLine,
   item,
@@ -1437,6 +1464,7 @@ export function AiHotboardScreen({
   const [remotePayload, setRemotePayload] = useState<MockPayload>(payload)
   const [remoteSourceLabel, setRemoteSourceLabel] = useState(DATA_SOURCE_LABEL)
   const [remoteGeneratedAt, setRemoteGeneratedAt] = useState(payload.generated_at)
+  const [feedMeta, setFeedMeta] = useState<FeedMeta>(EMPTY_FEED_META)
   const [voteAggregateByEvent, setVoteAggregateByEvent] = useState<VoteAggregateByEvent>({})
 
   const [intakeItemsByAgent, setIntakeItemsByAgent] = useState<Record<IntakeAgentKey, IntakeItem[]>>({
@@ -1612,6 +1640,7 @@ export function AiHotboardScreen({
         const body = (await response.json().catch(() => ({}))) as {
           generated_at?: string
           data_source?: string
+          meta?: Partial<FeedMeta>
           events?: Array<Record<string, unknown>>
         }
 
@@ -1630,6 +1659,12 @@ export function AiHotboardScreen({
           })
           setRemoteSourceLabel(String(body.data_source ?? DATA_SOURCE_LABEL))
           setRemoteGeneratedAt(String(body.generated_at ?? new Date().toISOString()))
+          setFeedMeta({
+            stale: body.meta?.stale === true,
+            partial_failures: Array.isArray(body.meta?.partial_failures)
+              ? body.meta.partial_failures.map((item) => String(item))
+              : [],
+          })
           return
         }
       } catch {
@@ -1644,6 +1679,7 @@ export function AiHotboardScreen({
         })
         setRemoteSourceLabel(DATA_SOURCE_LABEL)
         setRemoteGeneratedAt(payload.generated_at)
+        setFeedMeta(EMPTY_FEED_META)
       }
     }
 
@@ -2304,6 +2340,8 @@ export function AiHotboardScreen({
             tone="cyan"
           />
         </section>
+
+        <FeedMetaBanners meta={feedMeta} />
 
         <FeedTimeline
           timelineGroups={timelineGroups}

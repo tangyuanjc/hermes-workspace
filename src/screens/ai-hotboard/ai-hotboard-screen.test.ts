@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import {
   buildFeedStats,
+  FeedMetaBanners,
   FeedTimeline,
   JcHumanTalksComingSoonCard,
   RECOMMEND_BANNER_CLASS,
@@ -152,6 +153,14 @@ describe('JcHumanTalksComingSoonCard', () => {
   })
 })
 
+describe('FeedMetaBanners', () => {
+  it('surfaces partial failures and stale feed state', () => {
+    render(createElement(FeedMetaBanners, { meta: { stale: true, partial_failures: ['jc:bookmarks', 'x:likes'] } }))
+
+    expect(screen.getByText('🟡 部分信号源同步异常: jc:bookmarks, x:likes')).toBeTruthy()
+    expect(screen.getByText('⏰ 数据不新鲜,距上次成功同步超过 24 小时')).toBeTruthy()
+
+    cleanup()
   })
 })
 
