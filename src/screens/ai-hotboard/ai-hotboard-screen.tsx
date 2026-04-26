@@ -819,7 +819,7 @@ export function JcHumanTalksComingSoonCard() {
       <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>COMING SOON</div>
       <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>JC 的人类对谈</h2>
       <p className="mt-3 text-sm leading-6 text-slate-300">JC 与同行/朋友的高密度对谈精选片段,目前由 JC 手工从飞书妙记挑选。</p>
-      <p className="mt-2 text-sm leading-6 text-slate-400/80">第一批预计 W19 (2026-05) 上线,4-6 段 5-15 分钟精华。</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400/80">第一批预计近期上线,由 JC 手工从飞书妙记挑选数段精华片段,时长不一。</p>
     </section>
   )
 }

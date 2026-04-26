@@ -156,12 +156,14 @@ describe('resolveFeedSourceForPage', () => {
 })
 
 describe('JcHumanTalksComingSoonCard', () => {
-  it('renders the W19 coming-soon copy instead of generic placeholder metadata', () => {
+  it('renders relative coming-soon copy instead of hardcoded W19 metadata', () => {
     render(createElement(JcHumanTalksComingSoonCard))
 
     expect(screen.getByText('COMING SOON')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'JC 的人类对谈' })).toBeTruthy()
-    expect(screen.getByText(/第一批预计 W19 \(2026-05\) 上线/)).toBeTruthy()
+    expect(screen.getByText(/第一批预计近期上线/)).toBeTruthy()
+    expect(screen.getByText(/数段精华片段,时长不一/)).toBeTruthy()
+    expect(screen.queryByText(/W19|2026-05|4-6 段 5-15 分钟/)).toBeNull()
     expect(screen.queryByText(/V2 SLOT/)).toBeNull()
 
     cleanup()
