@@ -6,7 +6,8 @@ import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import { isAuthenticated } from './auth-middleware'
 
-type XSignalSource = 'x-bookmarks' | 'x-likes' | 'x-following' | 'x-for_you' | 'all'
+type XEventSource = 'x-bookmarks' | 'x-likes' | 'x-following' | 'x-for_you'
+type XSignalSource = XEventSource | 'all' | 'low-follower'
 
 type XTweet = {
   id?: string
@@ -66,7 +67,7 @@ type MockPayload = {
 
 type HotboardFeedEvent = {
   event_id: string
-  source: Exclude<XSignalSource, 'all'>
+  source: XEventSource
   source_line: string
   source_user: string
   title: string
@@ -82,14 +83,14 @@ type HotboardFeedEvent = {
 }
 
 const DEFAULT_X_SIGNAL_PATH = path.join(os.homedir(), '.hermes', 'tmp', 'x_signal_sync_latest.json')
-const SOURCE_SCHEMA = z.enum(['x-bookmarks', 'x-likes', 'x-following', 'x-for_you', 'all'])
-const SOURCE_MAP: Record<Exclude<XSignalSource, 'all'>, keyof XSignalPayload> = {
+const SOURCE_SCHEMA = z.enum(['x-bookmarks', 'x-likes', 'x-following', 'x-for_you', 'all', 'low-follower'])
+const SOURCE_MAP: Record<XEventSource, keyof XSignalPayload> = {
   'x-bookmarks': 'bookmarks',
   'x-likes': 'likes',
   'x-following': 'following',
   'x-for_you': 'for_you',
 }
-const SOURCE_KEYS = Object.keys(SOURCE_MAP) as Array<Exclude<XSignalSource, 'all'>>
+const SOURCE_KEYS = Object.keys(SOURCE_MAP) as XEventSource[]
 const DEFAULT_LIMIT = 30
 const X_SIGNAL_STALE_MS = 24 * 60 * 60 * 1000
 
@@ -128,6 +129,24 @@ function inferSignalScore(tweet: XTweet, source: Exclude<XSignalSource, 'all'>) 
   return Math.max(60, Math.min(99, 55 + sourceBonus + Math.min(weightedEngagement, 28)))
 }
 
+function lowFollowerProxyScore(event: HotboardFeedEvent) {
+  return (event.replies + event.retweets) / Math.max(event.likes, 1)
+}
+
+export function lowFollowerFilter(events: HotboardFeedEvent[]): HotboardFeedEvent[] {
+  return events
+    .filter((event) => event.replies + event.retweets > event.likes * 5)
+    .map((event) => {
+      const proxyScore = lowFollowerProxyScore(event)
+      return {
+        ...event,
+        title: event.title.startsWith('🔥 低粉爆款') ? event.title : `🔥 低粉爆款 (估算) · ${event.title}`,
+        signal_score: Math.max(event.signal_score, Math.min(99, Math.round(80 + proxyScore))),
+      }
+    })
+    .sort((a, b) => lowFollowerProxyScore(b) - lowFollowerProxyScore(a))
+}
+
 function normalizeSourceLine(tweet: XTweet) {
   const author = (tweet.author ?? '').trim()
   const name = (tweet.name ?? '').trim()
@@ -151,7 +170,7 @@ function normalizeTitle(tweet: XTweet) {
 
 function toHotboardEvent(
   tweet: XTweet,
-  source: Exclude<XSignalSource, 'all'>,
+  source: XEventSource,
   index: number,
 ): HotboardFeedEvent {
   const sourceUser = normalizeSourceUser(tweet)
@@ -214,7 +233,7 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
   const parsed = parseXSignalPayload(raw)
   if (!parsed) return null
 
-  const build = (key: Exclude<XSignalSource, 'all'>) => {
+  const build = (key: XEventSource) => {
     const items = (parsed[SOURCE_MAP[key]] ?? []) as XTweet[]
     return items.map((tweet, index) => toHotboardEvent(tweet, key, index))
   }
@@ -222,6 +241,8 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
   const events =
     source === 'all'
       ? SOURCE_KEYS.flatMap((key) => build(key)).sort((a, b) => b.timestamp_ms - a.timestamp_ms)
+      : source === 'low-follower'
+        ? lowFollowerFilter(SOURCE_KEYS.flatMap((key) => build(key)))
       : build(source)
 
   if (events.length === 0) return null
@@ -243,8 +264,8 @@ function loadMockPayload(): MockPayload {
   return JSON.parse(raw) as MockPayload
 }
 
-function mapMockSource(source: XSignalSource): Exclude<XSignalSource, 'all'> {
-  if (source !== 'all') return source
+function mapMockSource(source: XSignalSource): XEventSource {
+  if (source !== 'all' && source !== 'low-follower') return source
   return 'x-bookmarks'
 }
 

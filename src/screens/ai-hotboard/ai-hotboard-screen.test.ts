@@ -6,6 +6,7 @@ import {
   buildFeedStats,
   FeedTimeline,
   RECOMMEND_BANNER_CLASS,
+  resolveFeedSourceForPage,
   SIDEBAR_NAV_SEQUENCE,
   SIGNAL_BADGE_CLASS,
   SOURCE_ITEMS,
@@ -128,6 +129,12 @@ describe('FeedTimeline source user pill', () => {
     expect(screen.queryByTestId('x-source-user-pill')).toBeNull()
 
     cleanup()
+  })
+})
+
+describe('resolveFeedSourceForPage', () => {
+  it('routes low-follower view to the server-side proxy filter', () => {
+    expect(resolveFeedSourceForPage('view-low-follower', 'all')).toBe('low-follower')
   })
 })
 

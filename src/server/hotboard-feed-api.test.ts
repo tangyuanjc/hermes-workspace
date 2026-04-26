@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createSessionStore, storeSessionToken } from './auth-middleware'
-import { handleHotboardFeedGet } from './hotboard-feed-api'
+import { handleHotboardFeedGet, lowFollowerFilter } from './hotboard-feed-api'
 
 const tempDirs: string[] = []
 const originalXFeedPath = process.env.HOTBOARD_X_SIGNAL_PATH
@@ -69,6 +69,99 @@ function makeRequest(url: string) {
 }
 
 describe('hotboard feed api handlers', () => {
+  it('filters low-follower viral X events by proxy engagement heuristic', () => {
+    const filtered = lowFollowerFilter([
+      {
+        event_id: 'viral-high-ratio',
+        source: 'x-for_you',
+        source_line: '@small · Small Account',
+        source_user: 'jc',
+        title: 'viral high ratio',
+        summary: 'viral high ratio',
+        signal_score: 88,
+        likes: 10,
+        retweets: 46,
+        views: 1000,
+        replies: 20,
+        created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        url: '',
+        timestamp_ms: 1000,
+      },
+      {
+        event_id: 'viral-lower-ratio',
+        source: 'x-bookmarks',
+        source_line: '@small2 · Small Account 2',
+        source_user: 'jc',
+        title: 'viral lower ratio',
+        summary: 'viral lower ratio',
+        signal_score: 85,
+        likes: 20,
+        retweets: 75,
+        views: 1000,
+        replies: 30,
+        created_at: 'Wed Apr 16 11:00:00 +0000 2026',
+        url: '',
+        timestamp_ms: 900,
+      },
+      {
+        event_id: 'popular-not-proxy',
+        source: 'x-likes',
+        source_line: '@big · Big Account',
+        source_user: 'jc',
+        title: 'popular but like-heavy',
+        summary: 'popular but like-heavy',
+        signal_score: 90,
+        likes: 200,
+        retweets: 30,
+        views: 1000,
+        replies: 10,
+        created_at: 'Wed Apr 16 10:00:00 +0000 2026',
+        url: '',
+        timestamp_ms: 800,
+      },
+    ])
+
+    expect(filtered.map((event) => event.event_id)).toEqual(['viral-high-ratio', 'viral-lower-ratio'])
+    expect(filtered[0]?.signal_score).toBeGreaterThan(filtered[1]?.signal_score ?? 0)
+  })
+
+  it('returns low-follower proxy feed from all X sources', async () => {
+    createTempFeedFile({
+      bookmarks: [
+        {
+          id: 'bookmark-viral',
+          text: 'bookmark viral proxy',
+          likes: 10,
+          retweets: 46,
+          replies: 20,
+          views: 100,
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [
+        {
+          id: 'like-mainstream',
+          text: 'like mainstream',
+          likes: 200,
+          retweets: 30,
+          replies: 10,
+          views: 100,
+          created_at: 'Wed Apr 16 11:00:00 +0000 2026',
+        },
+      ],
+      following: [],
+      for_you: [],
+    })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=low-follower'))
+    expect(response.status).toBe(200)
+    const payload = (await response.json()) as { source: string; events: Array<{ event_id: string; title: string }> }
+
+    expect(payload.source).toBe('low-follower')
+    expect(payload.events.map((event) => event.event_id)).toEqual(['x-bookmarks-self-bookmark-viral'])
+    expect(payload.events[0]?.title).toContain('低粉爆款')
+  })
+
   it('returns transformed x feed cards for source=x-bookmarks', async () => {
     createTempFeedFile({
       bookmarks: [

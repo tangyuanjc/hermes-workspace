@@ -373,6 +373,11 @@ function resolveFeedModeByPage(page: AiHotboardPage): FeedMode {
   return 'featured'
 }
 
+export function resolveFeedSourceForPage(page: AiHotboardPage, source: string) {
+  if (page === 'view-low-follower') return 'low-follower'
+  return source
+}
+
 function isFeedPage(page: AiHotboardPage) {
   return (
     page === 'featured' ||
@@ -1409,7 +1414,7 @@ export function AiHotboardScreen({
 }) {
   const effectivePage = normalizeHotboardPage(page ?? resolveHotboardPageFromSource(source))
   const resolvedSource = resolveSourceByHotboardPage(effectivePage, source)
-  const normalizedSource = toSupportedHotboardSource(resolvedSource)
+  const normalizedSource = resolveFeedSourceForPage(effectivePage, toSupportedHotboardSource(resolvedSource))
   const feedMode = resolveFeedModeByPage(effectivePage)
 
   const userIdRef = useRef<string>('unknown-user')
