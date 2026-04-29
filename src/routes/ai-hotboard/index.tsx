@@ -6,5 +6,5 @@ export const Route = createFileRoute('/ai-hotboard/')({
 })
 
 function AiHotboardFeaturedRoute() {
-  return <AiHotboardRouteContent page="featured" source="all" />
+  return <AiHotboardRouteContent page="view-all" source="all" />
 }
