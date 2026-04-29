@@ -344,8 +344,7 @@ export const STRATEGY_ITERATION_ITEMS = [
 ] as const
 
 const PRIMARY_NAV_ITEMS = [
-  { key: 'featured', label: '精选', to: '/ai-hotboard' },
-  { key: 'view-all', label: '全部 AI 动态', to: '/ai-hotboard/view/all' },
+  { key: 'view-all', label: '全部 AI 动态', to: '/ai-hotboard' },
   { key: 'view-low-follower', label: '热议帖 (基于互动比 · follower 数据待接入)', to: '/ai-hotboard/view/low-follower' },
   { key: 'view-bookmarks', label: '收藏', to: '/ai-hotboard/view/bookmarks' },
 ] as const
@@ -361,7 +360,7 @@ export const SIDEBAR_NAV_SEQUENCE = [
   ...PRIMARY_NAV_ITEMS.map((item) => item.label),
   '信源',
   '信源提报',
-  '精选策略',
+  '策略线路',
   '策略迭代',
   ...SYSTEM_NAV_ITEMS.map((item) => item.label),
 ] as const
@@ -558,7 +557,7 @@ function getFeedHeading(page: AiHotboardPage) {
   if (page === 'featured') {
     return {
       title: 'AI 热点看板',
-      subtitle: '精选视图 · 汇总关键 AI 信号',
+      subtitle: '全量时间线 · 便于回看今日所有信号',
     }
   }
 
@@ -627,7 +626,7 @@ function getFeedHeading(page: AiHotboardPage) {
 
   return {
     title: 'AI 热点看板',
-    subtitle: '精选视图 · 汇总关键 AI 信号',
+    subtitle: '全量时间线 · 便于回看今日所有信号',
   }
 }
 
@@ -896,8 +895,7 @@ function SourceRouteItems({
 }
 
 function feedPageHighlightedNavKey(page: AiHotboardPage) {
-  if (page === 'featured') return 'featured'
-  if (page === 'view-all') return 'view-all'
+  if (page === 'featured' || page === 'view-all') return 'view-all'
   if (page === 'view-low-follower') return 'view-low-follower'
   if (page === 'view-bookmarks') return 'view-bookmarks'
   return undefined
@@ -974,12 +972,12 @@ export function FeedErrorBanners({ authCheckError, feedFetchError }: { authCheck
     <div className="space-y-3">
       {authCheckError ? (
         <div className="rounded-lg border border-red-300/30 bg-red-400/8 px-4 py-3 text-sm text-red-200/90">
-          身份核验失败, 请刷新页面或联系管理员
+          身份核验失败, 请刷新页面或联系管理员 (飞书私聊 JC)
         </div>
       ) : null}
       {feedFetchError ? (
         <div className="rounded-lg border border-red-300/30 bg-red-400/8 px-4 py-3 text-sm text-red-200/90">
-          数据加载失败, 请刷新页面或联系管理员
+          数据加载失败, 请刷新页面或联系管理员 (飞书私聊 JC)
         </div>
       ) : null}
     </div>
@@ -2689,7 +2687,7 @@ export function AiHotboardScreen({
 
             <div className="px-1 text-xs tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>策略</div>
             <SidebarSectionLinkGroup
-              title="精选策略"
+              title="策略线路"
               items={STRATEGY_ROUTE_ITEMS}
               highlightedKey={effectivePage === 'strategy-line' ? strategyHighlightedKey(normalizedStrategyLine) : undefined}
               testId="featured-strategy-section"

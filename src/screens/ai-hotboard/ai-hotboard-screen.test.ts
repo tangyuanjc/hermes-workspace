@@ -139,13 +139,12 @@ describe('ai-hotboard screen handoff constraints', () => {
 
   it('keeps left navigation sequence fixed and renders M2 lines only once', () => {
     expect(SIDEBAR_NAV_SEQUENCE).toEqual([
-      '精选',
       '全部 AI 动态',
       '热议帖 (基于互动比 · follower 数据待接入)',
       '收藏',
       '信源',
       '信源提报',
-      '精选策略',
+      '策略线路',
       '策略迭代',
       '系统',
       '用户',
@@ -444,8 +443,8 @@ describe('FeedErrorBanners', () => {
   it('surfaces auth-check and feed-fetch failures without exposing raw errors', () => {
     render(createElement(FeedErrorBanners, { authCheckError: 'HTTP 500', feedFetchError: 'network down' }))
 
-    expect(screen.getByText('身份核验失败, 请刷新页面或联系管理员')).toBeTruthy()
-    expect(screen.getByText('数据加载失败, 请刷新页面或联系管理员')).toBeTruthy()
+    expect(screen.getByText('身份核验失败, 请刷新页面或联系管理员 (飞书私聊 JC)')).toBeTruthy()
+    expect(screen.getByText('数据加载失败, 请刷新页面或联系管理员 (飞书私聊 JC)')).toBeTruthy()
     expect(screen.queryByText('HTTP 500')).toBeNull()
     expect(screen.queryByText('network down')).toBeNull()
 
