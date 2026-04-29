@@ -284,7 +284,7 @@ export const STRATEGY_ITERATION_ITEMS = [
 const PRIMARY_NAV_ITEMS = [
   { key: 'featured', label: '精选', to: '/ai-hotboard' },
   { key: 'view-all', label: '全部 AI 动态', to: '/ai-hotboard/view/all' },
-  { key: 'view-low-follower', label: '热议帖 (估算)', to: '/ai-hotboard/view/low-follower' },
+  { key: 'view-low-follower', label: '热议帖 (基于互动比 · follower 数据待接入)', to: '/ai-hotboard/view/low-follower' },
   { key: 'view-bookmarks', label: '收藏', to: '/ai-hotboard/view/bookmarks' },
 ] as const
 
@@ -509,7 +509,7 @@ function getFeedHeading(page: AiHotboardPage) {
 
   if (page === 'view-low-follower') {
     return {
-      title: '热议帖 (估算)',
+      title: '热议帖 (基于互动比 · follower 数据待接入)',
       subtitle: '互动比偏高的代理热点 · follower 数据待接入',
     }
   }
@@ -884,7 +884,7 @@ function V2PlaceholderPanel({
       <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>PLACEHOLDER</div>
       <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>{title}</h2>
       <div className="mt-3 rounded-2xl border border-cyan-400/35 bg-cyan-400/10 px-4 py-3 text-lg font-medium text-cyan-100">
-        v2 milestone 接入中 · 预计 {expectedWeek} 上线
+        当前由 {owner} 维护,数据接入窗口：{expectedWeek}
       </div>
       <div className="mt-4 space-y-2 text-sm text-slate-300">
         <div>数据来源：{dataSource}</div>
@@ -900,7 +900,7 @@ export function JcHumanTalksComingSoonCard() {
       <div className="text-[11px] tracking-[0.26em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>COMING SOON</div>
       <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>JC 的人类对谈</h2>
       <p className="mt-3 text-sm leading-6 text-slate-300">JC 与同行/朋友的高密度对谈精选片段,目前由 JC 手工从飞书妙记挑选。</p>
-      <p className="mt-2 text-sm leading-6 text-slate-400/80">第一批预计近期上线,由 JC 手工从飞书妙记挑选数段精华片段,时长不一。</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400/80">由 JC 手工挑选 · 暂无新内容</p>
     </section>
   )
 }
@@ -912,12 +912,12 @@ export function FeedErrorBanners({ authCheckError, feedFetchError }: { authCheck
     <div className="space-y-3">
       {authCheckError ? (
         <div className="rounded-lg border border-red-300/30 bg-red-400/8 px-4 py-3 text-sm text-red-200/90">
-          身份核验失败 - 请刷新或联系 JC
+          身份核验失败, 请刷新页面或联系管理员
         </div>
       ) : null}
       {feedFetchError ? (
         <div className="rounded-lg border border-red-300/30 bg-red-400/8 px-4 py-3 text-sm text-red-200/90">
-          数据加载失败 - 请刷新或联系 JC
+          数据加载失败, 请刷新页面或联系管理员
         </div>
       ) : null}
     </div>
@@ -933,12 +933,12 @@ export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
     <div className="space-y-3">
       {hasPartialFailures ? (
         <div className="rounded-lg border border-amber-300/30 bg-amber-400/8 px-4 py-3 text-sm text-amber-200/90">
-          🟡 部分信号源同步异常: {meta.partial_failures.join(', ')}
+          数据源同步异常: {meta.partial_failures.join(', ')}
         </div>
       ) : null}
       {meta.stale ? (
         <div className="rounded-lg border border-slate-300/20 bg-slate-700/30 px-4 py-3 text-sm text-slate-300/80">
-          ⏰ 数据不新鲜,距上次成功同步超过 24 小时
+          数据距上次同步 24h+, 可能过时
         </div>
       ) : null}
     </div>

@@ -94,7 +94,7 @@ describe('ai-hotboard screen handoff constraints', () => {
     expect(SIDEBAR_NAV_SEQUENCE).toEqual([
       '精选',
       '全部 AI 动态',
-      '热议帖 (估算)',
+      '热议帖 (基于互动比 · follower 数据待接入)',
       '收藏',
       '信源',
       '信源提报',
@@ -252,10 +252,10 @@ describe('JcHumanTalksComingSoonCard', () => {
 
     expect(screen.getByText('COMING SOON')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'JC 的人类对谈' })).toBeTruthy()
-    expect(screen.getByText(/第一批预计近期上线/)).toBeTruthy()
-    expect(screen.getByText(/数段精华片段,时长不一/)).toBeTruthy()
+    expect(screen.getByText('由 JC 手工挑选 · 暂无新内容')).toBeTruthy()
     expect(screen.queryByText(/W19|2026-05|4-6 段 5-15 分钟/)).toBeNull()
     expect(screen.queryByText(/V2 SLOT/)).toBeNull()
+    expect(screen.queryByText(/近期上线|敬请期待/)).toBeNull()
 
     cleanup()
   })
@@ -268,8 +268,8 @@ describe('FeedMetaBanners', () => {
     render(createElement(FeedMetaBanners, { meta: normalizeFeedMeta(response.meta) }))
 
     expect(response.events).toHaveLength(0)
-    expect(screen.getByText('🟡 部分信号源同步异常: x:bookmarks')).toBeTruthy()
-    expect(screen.getByText('⏰ 数据不新鲜,距上次成功同步超过 24 小时')).toBeTruthy()
+    expect(screen.getByText('数据源同步异常: x:bookmarks')).toBeTruthy()
+    expect(screen.getByText('数据距上次同步 24h+, 可能过时')).toBeTruthy()
 
     cleanup()
   })
@@ -277,8 +277,8 @@ describe('FeedMetaBanners', () => {
   it('surfaces partial failures and stale feed state', () => {
     render(createElement(FeedMetaBanners, { meta: { stale: true, partial_failures: ['jc:bookmarks', 'x:likes'] } }))
 
-    expect(screen.getByText('🟡 部分信号源同步异常: jc:bookmarks, x:likes')).toBeTruthy()
-    expect(screen.getByText('⏰ 数据不新鲜,距上次成功同步超过 24 小时')).toBeTruthy()
+    expect(screen.getByText('数据源同步异常: jc:bookmarks, x:likes')).toBeTruthy()
+    expect(screen.getByText('数据距上次同步 24h+, 可能过时')).toBeTruthy()
 
     cleanup()
   })
@@ -329,8 +329,8 @@ describe('FeedErrorBanners', () => {
   it('surfaces auth-check and feed-fetch failures without exposing raw errors', () => {
     render(createElement(FeedErrorBanners, { authCheckError: 'HTTP 500', feedFetchError: 'network down' }))
 
-    expect(screen.getByText('身份核验失败 - 请刷新或联系 JC')).toBeTruthy()
-    expect(screen.getByText('数据加载失败 - 请刷新或联系 JC')).toBeTruthy()
+    expect(screen.getByText('身份核验失败, 请刷新页面或联系管理员')).toBeTruthy()
+    expect(screen.getByText('数据加载失败, 请刷新页面或联系管理员')).toBeTruthy()
     expect(screen.queryByText('HTTP 500')).toBeNull()
     expect(screen.queryByText('network down')).toBeNull()
 
