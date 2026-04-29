@@ -65,9 +65,21 @@ type TimelineGroup = {
 const DATA_SOURCE_LABEL = ['ai_hotboard', 'mock_events.json'].join('_')
 const EMPTY_FEED_META: FeedMeta = { stale: false, partial_failures: [] }
 export const SEEN_EVENT_STORAGE_LIMIT = 1000
+export const SEEN_EVENT_DWELL_MS = 2500
+
+export function hashUserId(userId: string) {
+  const value = userId.trim() || 'unknown-user'
+  let hash = 5381
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) + hash + value.charCodeAt(index)) >>> 0
+  }
+
+  return hash.toString(36).slice(0, 12)
+}
 
 export function getSeenEventStorageKey(userId: string) {
-  return `ai-hotboard-seen-${userId.trim() || 'unknown-user'}`
+  return `ai-hotboard-seen-${hashUserId(userId)}`
 }
 
 function getSeenEventStorage(): SeenEventStorage | null {
@@ -142,6 +154,56 @@ export function writeSeenEventIds(
     storage.setItem(getSeenEventStorageKey(userId), JSON.stringify(nextIds))
   }
   return new Set(nextIds)
+}
+
+export function observeSeenEventDwell({
+  root,
+  onSeen,
+  dwellMs = SEEN_EVENT_DWELL_MS,
+}: {
+  root: Document | Element
+  onSeen: (eventId: string) => void
+  dwellMs?: number
+}) {
+  if (typeof IntersectionObserver === 'undefined') return () => {}
+
+  const timers = new Map<Element, ReturnType<typeof setTimeout>>()
+  const marked = new Set<string>()
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const element = entry.target as HTMLElement
+      const eventId = element.dataset.eventId?.trim()
+      if (!eventId || marked.has(eventId)) return
+
+      const isVisible = entry.isIntersecting && entry.intersectionRatio > 0
+      const existingTimer = timers.get(element)
+
+      if (!isVisible) {
+        if (existingTimer) clearTimeout(existingTimer)
+        timers.delete(element)
+        return
+      }
+
+      if (existingTimer) return
+
+      const timer = setTimeout(() => {
+        timers.delete(element)
+        marked.add(eventId)
+        onSeen(eventId)
+      }, dwellMs)
+      timers.set(element, timer)
+    })
+  })
+
+  root.querySelectorAll<HTMLElement>('[data-event-id]').forEach((element) => {
+    observer.observe(element)
+  })
+
+  return () => {
+    timers.forEach((timer) => clearTimeout(timer))
+    timers.clear()
+    observer.disconnect()
+  }
 }
 
 export function normalizeFeedMeta(meta?: Partial<FeedMeta>): FeedMeta {
@@ -1454,6 +1516,7 @@ export function FeedTimeline({
                     className={cn(HOTBOARD_CARD_CLASS, 'px-4 py-3 sm:px-5')}
                     style={HOTBOARD_CARD_STYLE}
                     data-testid="seen-event-collapsed"
+                    data-event-id={event.id}
                   >
                     <button
                       type="button"
@@ -1476,6 +1539,7 @@ export function FeedTimeline({
                   key={event.id}
                   className={cn(HOTBOARD_CARD_CLASS, 'px-4 py-4 sm:px-5 sm:py-5')}
                   style={HOTBOARD_CARD_STYLE}
+                  data-event-id={event.id}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-2">
@@ -1899,8 +1963,9 @@ export function AiHotboardScreen({
     [filteredTimelineEvents, voteAggregateByEvent],
   )
 
-  const visibleFeedEventIds = useMemo(
-    () => filteredTimelineEvents.map((event) => event.id),
+  const feedTimelineRootRef = useRef<HTMLDivElement | null>(null)
+  const visibleFeedEventIdsSignature = useMemo(
+    () => filteredTimelineEvents.map((event) => event.id).join('\n'),
     [filteredTimelineEvents],
   )
 
@@ -1910,9 +1975,14 @@ export function AiHotboardScreen({
   }, [seenUserId, effectivePage])
 
   useEffect(() => {
-    if (!isFeedPage(effectivePage) || visibleFeedEventIds.length === 0) return
-    writeSeenEventIds(seenUserId, visibleFeedEventIds)
-  }, [effectivePage, seenUserId, visibleFeedEventIds])
+    if (!isFeedPage(effectivePage) || !feedTimelineRootRef.current || visibleFeedEventIdsSignature.length === 0) return
+    return observeSeenEventDwell({
+      root: feedTimelineRootRef.current,
+      onSeen: (eventId) => {
+        setSeenEventIds(writeSeenEventIds(seenUserId, [eventId]))
+      },
+    })
+  }, [effectivePage, seenUserId, visibleFeedEventIdsSignature])
 
   function handleExpandSeenEvent(eventId: string) {
     setExpandedSeenEventIds((current) => {
@@ -2470,15 +2540,17 @@ export function AiHotboardScreen({
             </section>
           ) : null}
 
-          <FeedTimeline
-            timelineGroups={timelineGroups}
-            resolveVoteAggregate={resolveVoteAggregate}
-            handleVoteClick={handleVoteClick}
-            seenEventIds={seenEventIds}
-            showSeenEvents={showSeenEvents}
-            expandedSeenEventIds={expandedSeenEventIds}
-            onExpandSeenEvent={handleExpandSeenEvent}
-          />
+          <div ref={feedTimelineRootRef}>
+            <FeedTimeline
+              timelineGroups={timelineGroups}
+              resolveVoteAggregate={resolveVoteAggregate}
+              handleVoteClick={handleVoteClick}
+              seenEventIds={seenEventIds}
+              showSeenEvents={showSeenEvents}
+              expandedSeenEventIds={expandedSeenEventIds}
+              onExpandSeenEvent={handleExpandSeenEvent}
+            />
+          </div>
         </>
       )
     }
@@ -2553,15 +2625,17 @@ export function AiHotboardScreen({
 
         <FeedMetaBanners meta={feedMeta} />
 
-        <FeedTimeline
-          timelineGroups={timelineGroups}
-          resolveVoteAggregate={resolveVoteAggregate}
-          handleVoteClick={handleVoteClick}
-          seenEventIds={seenEventIds}
-          showSeenEvents={showSeenEvents}
-          expandedSeenEventIds={expandedSeenEventIds}
-          onExpandSeenEvent={handleExpandSeenEvent}
-        />
+        <div ref={feedTimelineRootRef}>
+          <FeedTimeline
+            timelineGroups={timelineGroups}
+            resolveVoteAggregate={resolveVoteAggregate}
+            handleVoteClick={handleVoteClick}
+            seenEventIds={seenEventIds}
+            showSeenEvents={showSeenEvents}
+            expandedSeenEventIds={expandedSeenEventIds}
+            onExpandSeenEvent={handleExpandSeenEvent}
+          />
+        </div>
       </>
     )
   }

@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import {
   buildFeedStats,
@@ -12,9 +12,11 @@ import {
   FeedTimeline,
   feedMatchesMode,
   getSeenEventStorageKey,
+  hashUserId,
   JcHumanTalksComingSoonCard,
   mergeSeenEventIds,
   normalizeFeedMeta,
+  observeSeenEventDwell,
   parseSeenEventIds,
   readSeenEventIds,
   RECOMMEND_BANNER_CLASS,
@@ -33,6 +35,51 @@ import {
   type VoteAggregateByEvent,
 } from './ai-hotboard-screen'
 import type { AuthUser } from '@/lib/hermes-auth'
+
+type MockIntersectionObserverEntry = Pick<IntersectionObserverEntry, 'target' | 'isIntersecting' | 'intersectionRatio'>
+
+class MockIntersectionObserver {
+  static latest: MockIntersectionObserver | null = null
+
+  readonly elements = new Set<Element>()
+
+  private readonly callback: IntersectionObserverCallback
+
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback
+    MockIntersectionObserver.latest = this
+  }
+
+  observe = (element: Element) => {
+    this.elements.add(element)
+  }
+
+  unobserve = (element: Element) => {
+    this.elements.delete(element)
+  }
+
+  disconnect = () => {
+    this.elements.clear()
+  }
+
+  takeRecords = () => []
+
+  trigger(element: Element, visible: boolean) {
+    const entry: MockIntersectionObserverEntry = {
+      target: element,
+      isIntersecting: visible,
+      intersectionRatio: visible ? 1 : 0,
+    }
+    this.callback([entry as IntersectionObserverEntry], this as unknown as IntersectionObserver)
+  }
+}
+
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  MockIntersectionObserver.latest = null
+})
 
 function makeTimelineEvent(overrides: Partial<TimelineEvent> & Pick<TimelineEvent, 'id'>): TimelineEvent {
   const { id, ...rest } = overrides
@@ -200,7 +247,8 @@ describe('seen event storage helpers', () => {
       },
     }
 
-    expect(getSeenEventStorageKey(' user-1 ')).toBe('ai-hotboard-seen-user-1')
+    expect(getSeenEventStorageKey(' user-1 ')).toBe(`ai-hotboard-seen-${hashUserId('user-1')}`)
+    expect(getSeenEventStorageKey('ou_feishu_open_id_123')).not.toContain('ou_feishu_open_id_123')
     storage.setItem(getSeenEventStorageKey('user-1'), JSON.stringify(['old', '', 'old']))
 
     expect(Array.from(readSeenEventIds('user-1', storage))).toEqual(['old'])
@@ -211,6 +259,73 @@ describe('seen event storage helpers', () => {
   it('keeps seen ids FIFO-capped at the storage limit', () => {
     expect(mergeSeenEventIds(['a', 'b'], ['c', 'd'], 3)).toEqual(['b', 'c', 'd'])
     expect(mergeSeenEventIds(['a', 'b'], ['b', 'c'], 10)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('observeSeenEventDwell', () => {
+  it('marks an event as seen only after it stays visible for 2500ms', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+
+    const element = document.createElement('article')
+    element.dataset.eventId = 'evt-visible'
+    const seen: string[] = []
+
+    const cleanupObserver = observeSeenEventDwell({
+      root: document,
+      onSeen: (eventId) => {
+        seen.push(eventId)
+      },
+    })
+
+    expect(MockIntersectionObserver.latest?.elements.has(element)).toBe(false)
+    document.body.appendChild(element)
+    cleanupObserver()
+
+    const attachedCleanup = observeSeenEventDwell({
+      root: document,
+      onSeen: (eventId) => {
+        seen.push(eventId)
+      },
+    })
+    const observer = MockIntersectionObserver.latest
+    expect(observer?.elements.has(element)).toBe(true)
+
+    observer?.trigger(element, true)
+    vi.advanceTimersByTime(2499)
+    expect(seen).toEqual([])
+
+    vi.advanceTimersByTime(1)
+    expect(seen).toEqual(['evt-visible'])
+
+    attachedCleanup()
+  })
+
+  it('does not mark an event if it leaves before dwell time completes', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+
+    const element = document.createElement('article')
+    element.dataset.eventId = 'evt-quick-skip'
+    document.body.appendChild(element)
+    const seen: string[] = []
+
+    const cleanupObserver = observeSeenEventDwell({
+      root: document,
+      onSeen: (eventId) => {
+        seen.push(eventId)
+      },
+    })
+    const observer = MockIntersectionObserver.latest
+
+    observer?.trigger(element, true)
+    vi.advanceTimersByTime(1200)
+    observer?.trigger(element, false)
+    vi.advanceTimersByTime(5000)
+
+    expect(seen).toEqual([])
+
+    cleanupObserver()
   })
 })
 
