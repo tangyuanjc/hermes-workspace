@@ -170,6 +170,18 @@ export function LoginScreen() {
             </div>
           </div>
 
+          <div className="mb-7 text-center">
+            <p
+              className="text-[2.15rem] leading-none tracking-tight text-slate-100"
+              style={EDITORIAL_DISPLAY_STYLE}
+            >
+              AI Hotboard · 内部信号看板
+            </p>
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-300">
+              实时聚合 X / 公众号 / Zara YouTube 等 AI 信号源, 团队投票 + 收藏 + 重要片段沉淀
+            </p>
+          </div>
+
           <h2
             className="mb-2 text-center text-[11px] uppercase tracking-[0.28em] text-cyan-300/70"
             style={EDITORIAL_MONO_STYLE}

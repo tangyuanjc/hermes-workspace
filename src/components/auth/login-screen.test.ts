@@ -19,4 +19,10 @@ describe('LoginScreen accessibility source contract', () => {
     expect(source.match(/role="alert"/g)).toHaveLength(3)
     expect(source.match(/aria-live="polite"/g)).toHaveLength(3)
   })
+
+  it('defines the product before the login form', () => {
+    expect(source).toContain('AI Hotboard · 内部信号看板')
+    expect(source).toContain('实时聚合 X / 公众号 / Zara YouTube 等 AI 信号源')
+    expect(source.indexOf('AI Hotboard · 内部信号看板')).toBeLessThan(source.indexOf("{isPassword ? '账号登录' : '邮箱登录'}"))
+  })
 })
