@@ -5,7 +5,8 @@
 - `ai.hermes.aihotboard-backup` runs from `~/Library/LaunchAgents/ai.hermes.aihotboard-backup.plist` every day at 03:30.
 - The tracked plist template lives at `launchd/ai.hermes.aihotboard-backup.plist`.
 - The script is `scripts/backup-aihotboard-sqlite.sh` and must stay `chmod 700`.
-- Source data is `~/.hermes/data/auth.sqlite`, `~/.hermes/data/hotboard.sqlite`, and `~/.hermes/data/hotboard-zara.sqlite`.
+- Source data is limited to business DBs: `~/.hermes/data/hotboard.sqlite` and `~/.hermes/data/hotboard-zara.sqlite`.
+- `auth.sqlite` is intentionally excluded from cloud backup because it contains sessions, magic links, and email whitelist data. It stays local; Time Machine is the fallback, and users can re-login after auth DB loss.
 - SQLite copies use `sqlite3 .backup`, not `cp`, so live database locks are handled safely.
 - Local tarballs are written to `~/.hermes/data/backups/aihotboard-YYYY-MM-DD.tar.gz` with `chmod 600`.
 - Local retention is 7 days via `find ~/.hermes/data/backups -name 'aihotboard-*.tar.gz' -mtime +7 -type f -delete`.
