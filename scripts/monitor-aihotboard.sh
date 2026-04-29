@@ -26,33 +26,62 @@ elif [ "$HTTP" != "200" ]; then
   ALERT="ai-hotboard HTTP probe failed: $HTTP"
 fi
 
-PREV_STATE="$(cat "$STATE_FILE" 2>/dev/null || echo "ok")"
+RAW_STATE="$(cat "$STATE_FILE" 2>/dev/null || echo "ok,0,0")"
+IFS=',' read -r PREV_STATE PREV_FAILURE_COUNT PREV_WINDOW_START <<EOF
+$RAW_STATE
+EOF
+PREV_STATE="${PREV_STATE:-ok}"
+PREV_FAILURE_COUNT="${PREV_FAILURE_COUNT:-0}"
+PREV_WINDOW_START="${PREV_WINDOW_START:-0}"
+case "$PREV_FAILURE_COUNT" in ''|*[!0-9]*) PREV_FAILURE_COUNT=0 ;; esac
+case "$PREV_WINDOW_START" in ''|*[!0-9]*) PREV_WINDOW_START=0 ;; esac
 PREV_TIME="$(stat -f %m "$STATE_FILE" 2>/dev/null || echo 0)"
 NOW="$(date +%s)"
+if [ $((NOW - PREV_WINDOW_START)) -gt 3600 ]; then
+  FAILURE_COUNT=1
+  WINDOW_START="$NOW"
+else
+  FAILURE_COUNT=$((PREV_FAILURE_COUNT + 1))
+  WINDOW_START="$PREV_WINDOW_START"
+  [ "$WINDOW_START" -gt 0 ] || WINDOW_START="$NOW"
+fi
 
 send_message() {
   local body="$1"
   "$LARK_CLI" im +messages-send --as bot --user-id "$ALERT_USER_ID" --text "$body" >> "$LOG_DIR/aihotboard-monitor.out.log"
 }
 
+write_state() {
+  printf '%s,%s,%s
+' "$1" "$2" "$3" > "$STATE_FILE"
+  chmod 600 "$STATE_FILE"
+}
+
 if [ -n "$ALERT" ]; then
-  if [ "$PREV_STATE" = "ok" ] || [ $((NOW - PREV_TIME)) -gt "$THROTTLE_SECONDS" ]; then
-    send_message "🚨 ai-hotboard 异常
-$ALERT
-时间: $(date)"
-    echo "alert" > "$STATE_FILE"
-    chmod 600 "$STATE_FILE"
-  elif [ ! -f "$STATE_FILE" ]; then
-    echo "alert" > "$STATE_FILE"
-    chmod 600 "$STATE_FILE"
+  EXTRA=""
+  if [ "$FAILURE_COUNT" -gt 3 ]; then
+    EXTRA="
+🔴 持续抖动 ${FAILURE_COUNT}x in 1h"
+  fi
+
+  if [ "$PREV_STATE" = "ok" ] || [ $((NOW - PREV_TIME)) -ge "$THROTTLE_SECONDS" ]; then
+    if send_message "🚨 ai-hotboard 异常
+$ALERT${EXTRA}
+时间: $(date)"; then
+      write_state "alert" "$FAILURE_COUNT" "$WINDOW_START"
+    else
+      echo "alert send failed: $ALERT" >&2
+      write_state "ok" "$FAILURE_COUNT" "$WINDOW_START"
+    fi
   fi
   echo "alert: $ALERT"
 else
   if [ "$PREV_STATE" = "alert" ]; then
-    send_message "✅ ai-hotboard 已恢复
-时间: $(date)"
+    if ! send_message "✅ ai-hotboard 已恢复
+时间: $(date)"; then
+      echo "recovery send failed" >&2
+    fi
   fi
-  echo "ok" > "$STATE_FILE"
-  chmod 600 "$STATE_FILE"
+  write_state "ok" "0" "$NOW"
   echo "ok: launchd=$STATUS http=$HTTP"
 fi

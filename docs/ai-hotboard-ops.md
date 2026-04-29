@@ -21,10 +21,10 @@
 - The script is `scripts/monitor-aihotboard.sh` and must stay `chmod 700`.
 - It checks `launchctl print gui/$(id -u)/ai.hermes.aihotboard` for `state = running`.
 - It probes `http://localhost:3000/ai-hotboard` and expects HTTP `200`.
-- State is stored at `~/.hermes/data/.aihotboard-monitor-state` with `chmod 600`.
+- State is stored as `state,failure_count,window_start` at `~/.hermes/data/.aihotboard-monitor-state` with `chmod 600`.
 - Alert transition: previous `ok` to current failure sends one Feishu IM.
 - Recovery transition: previous `alert` to current healthy sends one Feishu IM.
-- Sustained failure is rate-limited to one alert per hour by default.
+- Sustained failure is rate-limited to one alert per hour by default; if send fails, state remains `ok` with a rolling failure count so the next 5-minute run retries instead of throttling.
 - Feishu IM uses `lark-cli im +messages-send --as bot`; the default recipient is `ou_a06ae3d7885f83839917ac0f44e46247`, JC's open_id for this `lark-cli` app.
 - Override the recipient without editing credentials: `AIHOTBOARD_ALERT_USER_ID=<open_id> scripts/monitor-aihotboard.sh`.
 
