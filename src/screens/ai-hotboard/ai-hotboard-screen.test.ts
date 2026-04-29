@@ -21,6 +21,8 @@ import {
   SOURCE_SUBMISSION_ITEMS,
   STRATEGY_ITERATION_ITEMS,
   STRATEGY_LINES,
+  WechatIngestPanel,
+  ZaraRefreshPanel,
   type TimelineEvent,
   type VoteAggregateByEvent,
 } from './ai-hotboard-screen'
@@ -189,6 +191,47 @@ describe('FeedMetaBanners', () => {
 
     expect(screen.getByText('🟡 部分信号源同步异常: jc:bookmarks, x:likes')).toBeTruthy()
     expect(screen.getByText('⏰ 数据不新鲜,距上次成功同步超过 24 小时')).toBeTruthy()
+
+    cleanup()
+  })
+})
+
+describe('owner-only source action panels', () => {
+  const member = { id: 'paopao', username: 'paopao', displayName: 'paopao', role: 'member' as const }
+  const owner = { id: 'jc', username: 'jc', displayName: 'JC', role: 'owner' as const }
+
+  it('hides WeChat owner drop UI for members while keeping owner controls renderable', () => {
+    const props = {
+      draftUrl: '',
+      onDraftUrlChange: () => {},
+      onSubmit: () => {},
+      submitting: false,
+      requestError: null,
+    }
+
+    const { rerender } = render(createElement(WechatIngestPanel, { ...props, authUser: member }))
+    expect(screen.queryByText(/当前账号为只读身份/)).toBeNull()
+    expect(screen.queryByText(/粘贴微信公众号文章 URL/)).toBeNull()
+
+    rerender(createElement(WechatIngestPanel, { ...props, authUser: owner }))
+    expect(screen.getByText('粘贴微信公众号文章 URL')).toBeTruthy()
+
+    cleanup()
+  })
+
+  it('hides Zara refresh locked card for members while keeping owner controls renderable', () => {
+    const props = {
+      onRefresh: () => {},
+      refreshing: false,
+      requestError: null,
+    }
+
+    const { rerender } = render(createElement(ZaraRefreshPanel, { ...props, authUser: member }))
+    expect(screen.queryByText('REFRESH LOCKED')).toBeNull()
+    expect(screen.queryByText(/当前账号为只读身份/)).toBeNull()
+
+    rerender(createElement(ZaraRefreshPanel, { ...props, authUser: owner }))
+    expect(screen.getByText('Zara YouTube 精选刷新')).toBeTruthy()
 
     cleanup()
   })

@@ -1067,7 +1067,7 @@ function IterationPanel() {
   )
 }
 
-function WechatIngestPanel({
+export function WechatIngestPanel({
   authUser,
   draftUrl,
   onDraftUrlChange,
@@ -1083,19 +1083,7 @@ function WechatIngestPanel({
   requestError: string | null
 }) {
   if (authUser?.role !== 'owner') {
-    return (
-      <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-slate-950/55 text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <HugeiconsIcon icon={LinkSquareIcon} size={22} strokeWidth={1.6} />
-          </span>
-          <div>
-            <div className="text-[11px] tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>OWNER DROP</div>
-            <div className="mt-2 text-base text-slate-100">当前账号为只读身份，公众号 URL 投递仅 owner 可用。</div>
-          </div>
-        </div>
-      </section>
-    )
+    return null
   }
 
   return (
@@ -1151,7 +1139,7 @@ function WechatIngestPanel({
   )
 }
 
-function ZaraRefreshPanel({
+export function ZaraRefreshPanel({
   authUser,
   onRefresh,
   refreshing,
@@ -1163,19 +1151,7 @@ function ZaraRefreshPanel({
   requestError: string | null
 }) {
   if (authUser?.role !== 'owner') {
-    return (
-      <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/10 bg-slate-950/55 text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <HugeiconsIcon icon={ActivitySparkIcon} size={22} strokeWidth={1.6} />
-          </span>
-          <div>
-            <div className="text-[11px] tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>REFRESH LOCKED</div>
-            <div className="mt-2 text-base text-slate-100">当前账号为只读身份，Zara 源刷新仅 owner 可用。</div>
-          </div>
-        </div>
-      </section>
-    )
+    return null
   }
 
   return (
