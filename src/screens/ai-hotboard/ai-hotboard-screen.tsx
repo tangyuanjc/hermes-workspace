@@ -46,6 +46,8 @@ type FeedMeta = {
   partial_failures: string[]
 }
 
+type SeenEventStorage = Pick<Storage, 'getItem' | 'setItem'>
+
 export type TimelineEvent = MockEvent & {
   id: string
   signalScore: number
@@ -62,6 +64,85 @@ type TimelineGroup = {
 
 const DATA_SOURCE_LABEL = ['ai_hotboard', 'mock_events.json'].join('_')
 const EMPTY_FEED_META: FeedMeta = { stale: false, partial_failures: [] }
+export const SEEN_EVENT_STORAGE_LIMIT = 1000
+
+export function getSeenEventStorageKey(userId: string) {
+  return `ai-hotboard-seen-${userId.trim() || 'unknown-user'}`
+}
+
+function getSeenEventStorage(): SeenEventStorage | null {
+  if (typeof window === 'undefined') return null
+  return window.localStorage
+}
+
+export function parseSeenEventIds(raw: string | null): string[] {
+  if (!raw) return []
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    const values = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { ids?: unknown }).ids)
+      ? (parsed as { ids: unknown[] }).ids
+      : []
+    const seen = new Set<string>()
+    const ids: string[] = []
+
+    values.forEach((value) => {
+      const id = typeof value === 'string' ? value.trim() : ''
+      if (!id || seen.has(id)) return
+      seen.add(id)
+      ids.push(id)
+    })
+
+    return ids
+  } catch {
+    return []
+  }
+}
+
+export function mergeSeenEventIds(
+  existingIds: Iterable<string>,
+  incomingIds: Iterable<string>,
+  limit = SEEN_EVENT_STORAGE_LIMIT,
+) {
+  const merged: string[] = []
+  const seen = new Set<string>()
+
+  for (const value of existingIds) {
+    const id = value.trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    merged.push(id)
+  }
+
+  for (const value of incomingIds) {
+    const id = value.trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    merged.push(id)
+  }
+
+  return merged.slice(Math.max(0, merged.length - limit))
+}
+
+export function readSeenEventIds(userId: string, storage: SeenEventStorage | null = getSeenEventStorage()) {
+  if (!storage) return new Set<string>()
+  return new Set(parseSeenEventIds(storage.getItem(getSeenEventStorageKey(userId))))
+}
+
+export function writeSeenEventIds(
+  userId: string,
+  ids: Iterable<string>,
+  storage: SeenEventStorage | null = getSeenEventStorage(),
+) {
+  const existingIds = storage ? parseSeenEventIds(storage.getItem(getSeenEventStorageKey(userId))) : []
+  const nextIds = mergeSeenEventIds(existingIds, ids)
+  if (storage) {
+    storage.setItem(getSeenEventStorageKey(userId), JSON.stringify(nextIds))
+  }
+  return new Set(nextIds)
+}
 
 export function normalizeFeedMeta(meta?: Partial<FeedMeta>): FeedMeta {
   return {
@@ -864,6 +945,25 @@ export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
   )
 }
 
+export function SeenEventsToggle({
+  showSeenEvents,
+  onToggle,
+}: {
+  showSeenEvents: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={showSeenEvents}
+      className={cn(HOTBOARD_SECONDARY_BUTTON_CLASS, 'border-cyan-300/20 text-slate-100 hover:border-cyan-200/45')}
+    >
+      {showSeenEvents ? '[x]' : '[ ]'} 显示已读
+    </button>
+  )
+}
+
 function StrategyPanel({
   strategyLine,
   item,
@@ -1299,10 +1399,18 @@ export function FeedTimeline({
   timelineGroups,
   resolveVoteAggregate,
   handleVoteClick,
+  seenEventIds = new Set<string>(),
+  showSeenEvents = false,
+  expandedSeenEventIds = new Set<string>(),
+  onExpandSeenEvent,
 }: {
   timelineGroups: TimelineGroup[]
   resolveVoteAggregate: (event: TimelineEvent) => VoteAggregateEntry
   handleVoteClick: (eventId: string, voteType: VoteType, baseline?: VoteAggregateEntry) => void
+  seenEventIds?: ReadonlySet<string>
+  showSeenEvents?: boolean
+  expandedSeenEventIds?: ReadonlySet<string>
+  onExpandSeenEvent?: (eventId: string) => void
 }) {
   if (timelineGroups.length === 0) {
     return (
@@ -1336,6 +1444,33 @@ export function FeedTimeline({
             {group.events.map((event) => {
               const voteState = resolveVoteAggregate(event)
               const sourceUser = event.source_user?.trim()
+              const isSeen = seenEventIds.has(event.id)
+              const isCollapsedSeen = isSeen && !showSeenEvents && !expandedSeenEventIds.has(event.id)
+
+              if (isCollapsedSeen) {
+                return (
+                  <article
+                    key={event.id}
+                    className={cn(HOTBOARD_CARD_CLASS, 'px-4 py-3 sm:px-5')}
+                    style={HOTBOARD_CARD_STYLE}
+                    data-testid="seen-event-collapsed"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onExpandSeenEvent?.(event.id)}
+                      className="flex w-full items-center justify-between gap-3 text-left"
+                    >
+                      <span className="min-w-0 truncate text-[1.35rem] leading-tight text-slate-200" style={EDITORIAL_DISPLAY_STYLE}>
+                        {event.title}
+                      </span>
+                      <span className="shrink-0 rounded-full border border-slate-500/50 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-400" style={EDITORIAL_MONO_STYLE}>
+                        已读 · 点击展开
+                      </span>
+                    </button>
+                  </article>
+                )
+              }
+
               return (
                 <article
                   key={event.id}
@@ -1481,6 +1616,10 @@ export function AiHotboardScreen({
   const [feedMeta, setFeedMeta] = useState<FeedMeta>(EMPTY_FEED_META)
   const [feedFetchError, setFeedFetchError] = useState<string | null>(null)
   const [voteAggregateByEvent, setVoteAggregateByEvent] = useState<VoteAggregateByEvent>({})
+  const [seenUserId, setSeenUserId] = useState('unknown-user')
+  const [seenEventIds, setSeenEventIds] = useState<Set<string>>(() => readSeenEventIds('unknown-user'))
+  const [showSeenEvents, setShowSeenEvents] = useState(false)
+  const [expandedSeenEventIds, setExpandedSeenEventIds] = useState<Set<string>>(() => new Set())
 
   const [intakeItemsByAgent, setIntakeItemsByAgent] = useState<Record<IntakeAgentKey, IntakeItem[]>>({
     hermes: [],
@@ -1760,6 +1899,29 @@ export function AiHotboardScreen({
     [filteredTimelineEvents, voteAggregateByEvent],
   )
 
+  const visibleFeedEventIds = useMemo(
+    () => filteredTimelineEvents.map((event) => event.id),
+    [filteredTimelineEvents],
+  )
+
+  useEffect(() => {
+    setSeenEventIds(readSeenEventIds(seenUserId))
+    setExpandedSeenEventIds(new Set())
+  }, [seenUserId, effectivePage])
+
+  useEffect(() => {
+    if (!isFeedPage(effectivePage) || visibleFeedEventIds.length === 0) return
+    writeSeenEventIds(seenUserId, visibleFeedEventIds)
+  }, [effectivePage, seenUserId, visibleFeedEventIds])
+
+  function handleExpandSeenEvent(eventId: string) {
+    setExpandedSeenEventIds((current) => {
+      const next = new Set(current)
+      next.add(eventId)
+      return next
+    })
+  }
+
   useEffect(() => {
     let cancelled = false
 
@@ -1771,10 +1933,13 @@ export function AiHotboardScreen({
 
         setAuthRequired(Boolean(auth.authRequired && !auth.authenticated))
         if (auth.user?.feishu_open_id || auth.user?.email) {
-          userIdRef.current = auth.user.feishu_open_id || auth.user.email || auth.user.id
+          const nextUserId = auth.user.feishu_open_id || auth.user.email || auth.user.id || 'unknown-user'
+          userIdRef.current = nextUserId
+          setSeenUserId(nextUserId)
           setAuthUser(auth.user)
         } else {
           setAuthUser(null)
+          setSeenUserId('unknown-user')
         }
       } catch (error) {
         console.error('[ai-hotboard] auth-check failed', error)
@@ -1801,6 +1966,7 @@ export function AiHotboardScreen({
         if (cancelled) return
         if (data.user_id && data.user_id.trim()) {
           userIdRef.current = data.user_id
+          setSeenUserId(data.user_id)
         }
         setVoteAggregateByEvent(
           data.aggregate && typeof data.aggregate === 'object' ? data.aggregate : {},
@@ -2308,6 +2474,10 @@ export function AiHotboardScreen({
             timelineGroups={timelineGroups}
             resolveVoteAggregate={resolveVoteAggregate}
             handleVoteClick={handleVoteClick}
+            seenEventIds={seenEventIds}
+            showSeenEvents={showSeenEvents}
+            expandedSeenEventIds={expandedSeenEventIds}
+            onExpandSeenEvent={handleExpandSeenEvent}
           />
         </>
       )
@@ -2387,6 +2557,10 @@ export function AiHotboardScreen({
           timelineGroups={timelineGroups}
           resolveVoteAggregate={resolveVoteAggregate}
           handleVoteClick={handleVoteClick}
+          seenEventIds={seenEventIds}
+          showSeenEvents={showSeenEvents}
+          expandedSeenEventIds={expandedSeenEventIds}
+          onExpandSeenEvent={handleExpandSeenEvent}
         />
       </>
     )
@@ -2508,6 +2682,12 @@ export function AiHotboardScreen({
                   {isLoggingOut ? '切换中...' : '切换账号'}
                 </button>
               </div>
+              {isFeedPage(effectivePage) ? (
+                <SeenEventsToggle
+                  showSeenEvents={showSeenEvents}
+                  onToggle={() => setShowSeenEvents((value) => !value)}
+                />
+              ) : null}
             </div>
           </header>
 

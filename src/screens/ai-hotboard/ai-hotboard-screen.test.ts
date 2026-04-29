@@ -4,17 +4,22 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import {
   buildFeedStats,
   FeedErrorBanners,
   FeedMetaBanners,
   FeedTimeline,
   feedMatchesMode,
+  getSeenEventStorageKey,
   JcHumanTalksComingSoonCard,
+  mergeSeenEventIds,
   normalizeFeedMeta,
+  parseSeenEventIds,
+  readSeenEventIds,
   RECOMMEND_BANNER_CLASS,
   resolveFeedSourceForPage,
+  SeenEventsToggle,
   SIDEBAR_NAV_SEQUENCE,
   SIGNAL_BADGE_CLASS,
   SOURCE_ITEMS,
@@ -22,15 +27,18 @@ import {
   STRATEGY_ITERATION_ITEMS,
   STRATEGY_LINES,
   WechatIngestPanel,
+  writeSeenEventIds,
   ZaraRefreshPanel,
   type TimelineEvent,
   type VoteAggregateByEvent,
 } from './ai-hotboard-screen'
+import type { AuthUser } from '@/lib/hermes-auth'
 
 function makeTimelineEvent(overrides: Partial<TimelineEvent> & Pick<TimelineEvent, 'id'>): TimelineEvent {
+  const { id, ...rest } = overrides
   return {
-    id: overrides.id,
-    event_id: overrides.id,
+    id,
+    event_id: id,
     timestamp: '10:00',
     created_at: '10:00',
     source_type: 'X',
@@ -51,7 +59,19 @@ function makeTimelineEvent(overrides: Partial<TimelineEvent> & Pick<TimelineEven
     recommendReasonLine: '',
     condensedSourceLabel: '',
     aggregatedSourcesLabel: null,
-    ...overrides,
+    ...rest,
+  }
+}
+
+function makeAuthUser(overrides: Partial<AuthUser> & Pick<AuthUser, 'id' | 'role'>): AuthUser {
+  const { id, ...rest } = overrides
+  return {
+    id,
+    feishu_open_id: null,
+    feishu_union_id: null,
+    email: null,
+    display_name: id,
+    ...rest,
   }
 }
 
@@ -143,6 +163,73 @@ describe('FeedTimeline source user pill', () => {
   })
 })
 
+describe('FeedTimeline seen state', () => {
+  const voteAggregate = { like_count: 0, dislike_count: 0, bookmark_count: 0, my_vote: [] }
+
+  it('collapses seen events until the item is expanded or the toggle shows seen items', () => {
+    const timelineGroups = [{ timestamp: '10:00', events: [makeTimelineEvent({ id: 'evt-seen', title: 'Seen title', summary: 'Seen summary' })] }]
+    const props = {
+      timelineGroups,
+      resolveVoteAggregate: () => voteAggregate,
+      handleVoteClick: () => {},
+      seenEventIds: new Set(['evt-seen']),
+    }
+
+    const { rerender } = render(createElement(FeedTimeline, props))
+    expect(screen.getByTestId('seen-event-collapsed')).toBeTruthy()
+    expect(screen.getByText('已读 · 点击展开')).toBeTruthy()
+    expect(screen.queryByText('Seen summary')).toBeNull()
+
+    rerender(createElement(FeedTimeline, { ...props, expandedSeenEventIds: new Set(['evt-seen']) }))
+    expect(screen.getByText('Seen summary')).toBeTruthy()
+
+    rerender(createElement(FeedTimeline, { ...props, showSeenEvents: true }))
+    expect(screen.getByText('Seen summary')).toBeTruthy()
+
+    cleanup()
+  })
+})
+
+describe('seen event storage helpers', () => {
+  it('reads and writes user-scoped localStorage keys', () => {
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value)
+      },
+    }
+
+    expect(getSeenEventStorageKey(' user-1 ')).toBe('ai-hotboard-seen-user-1')
+    storage.setItem(getSeenEventStorageKey('user-1'), JSON.stringify(['old', '', 'old']))
+
+    expect(Array.from(readSeenEventIds('user-1', storage))).toEqual(['old'])
+    expect(Array.from(writeSeenEventIds('user-1', ['new'], storage))).toEqual(['old', 'new'])
+    expect(parseSeenEventIds(storage.getItem(getSeenEventStorageKey('user-1')))).toEqual(['old', 'new'])
+  })
+
+  it('keeps seen ids FIFO-capped at the storage limit', () => {
+    expect(mergeSeenEventIds(['a', 'b'], ['c', 'd'], 3)).toEqual(['b', 'c', 'd'])
+    expect(mergeSeenEventIds(['a', 'b'], ['b', 'c'], 10)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('SeenEventsToggle', () => {
+  it('toggles display of seen items with pressed state', () => {
+    let toggled = 0
+    const { rerender } = render(createElement(SeenEventsToggle, { showSeenEvents: false, onToggle: () => { toggled += 1 } }))
+
+    expect(screen.getByRole('button', { name: '[ ] 显示已读' }).getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: '[ ] 显示已读' }))
+    expect(toggled).toBe(1)
+
+    rerender(createElement(SeenEventsToggle, { showSeenEvents: true, onToggle: () => { toggled += 1 } }))
+    expect(screen.getByRole('button', { name: '[x] 显示已读' }).getAttribute('aria-pressed')).toBe('true')
+
+    cleanup()
+  })
+})
+
 describe('resolveFeedSourceForPage', () => {
   it('routes low-follower view to the server-side proxy filter', () => {
     expect(resolveFeedSourceForPage('view-low-follower', 'all')).toBe('low-follower')
@@ -198,8 +285,8 @@ describe('FeedMetaBanners', () => {
 })
 
 describe('owner-only source action panels', () => {
-  const member = { id: 'paopao', username: 'paopao', displayName: 'paopao', role: 'member' as const }
-  const owner = { id: 'jc', username: 'jc', displayName: 'JC', role: 'owner' as const }
+  const member = makeAuthUser({ id: 'paopao', role: 'member' })
+  const owner = makeAuthUser({ id: 'jc', display_name: 'JC', role: 'owner' })
 
   it('hides WeChat owner drop UI for members while keeping owner controls renderable', () => {
     const props = {
