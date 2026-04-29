@@ -1369,7 +1369,12 @@ export function FeedTimeline({
                     </div>
 
                     <div className="flex shrink-0 items-start gap-2 pl-2">
-                      <span className={SIGNAL_BADGE_CLASS} data-testid="signal-score-badge" aria-label={`信号分 ${event.signalScore}`}>
+                      <span
+                        className={SIGNAL_BADGE_CLASS}
+                        data-testid="signal-score-badge"
+                        aria-label={`信号分 ${event.signalScore}`}
+                        title="信号分: 基于标签 / 分类 / 互动综合评分, 60-99 为有效信号"
+                      >
                         {event.signalScore}
                       </span>
                       <div className="flex gap-1 text-xs text-slate-400">

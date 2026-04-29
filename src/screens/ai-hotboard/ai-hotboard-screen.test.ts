@@ -123,6 +123,7 @@ describe('FeedTimeline source user pill', () => {
     )
 
     expect(screen.getByTestId('x-source-user-pill').textContent).toBe('@builder')
+    expect(screen.getByTestId('signal-score-badge').getAttribute('title')).toBe('信号分: 基于标签 / 分类 / 互动综合评分, 60-99 为有效信号')
 
     cleanup()
   })
