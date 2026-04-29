@@ -1242,12 +1242,25 @@ export function WechatIngestPanel({
   submitting: boolean
   requestError: string | null
 }) {
-  if (authUser?.role !== 'owner') {
-    return null
+  const isOwner = authUser?.role === 'owner'
+
+  function showOwnerOnlyToast(event: { currentTarget: HTMLElement }) {
+    if (isOwner) return
+    event.currentTarget.querySelector<HTMLElement>('[data-owner-only-toast]')?.removeAttribute('hidden')
+  }
+
+  function handleSubmit() {
+    if (!isOwner) return
+    onSubmit()
   }
 
   return (
-    <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
+    <section
+      className={cn(HOTBOARD_COMPACT_PANEL_CLASS, !isOwner && 'cursor-not-allowed opacity-50')}
+      style={HOTBOARD_CARD_STYLE}
+      data-testid="wechat-ingest-panel"
+      onClick={showOwnerOnlyToast}
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-3">
@@ -1277,21 +1290,27 @@ export function WechatIngestPanel({
           <input
             type="url"
             value={draftUrl}
-            onChange={(event) => onDraftUrlChange(event.target.value)}
-            placeholder="https://mp.weixin.qq.com/s/..."
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
+            onChange={(event) => {
+              if (isOwner) onDraftUrlChange(event.target.value)
+            }}
+            disabled={!isOwner}
+            placeholder={isOwner ? 'https://mp.weixin.qq.com/s/...' : 'owner 限定 · 联系 JC 开权限'}
+            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500 disabled:cursor-not-allowed"
           />
         </div>
         <button
           type="button"
-          onClick={onSubmit}
-          disabled={submitting}
+          onClick={handleSubmit}
+          disabled={!isOwner || submitting}
           className={cn(HOTBOARD_PRIMARY_BUTTON_CLASS, 'min-w-[8.5rem]')}
         >
           {submitting ? '抓取中...' : '抓取文章'}
           <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
         </button>
       </div>
+      {!isOwner ? (
+        <div hidden data-owner-only-toast className="mt-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">此功能仅限 owner, 请联系 JC</div>
+      ) : null}
       {requestError ? (
         <div className="mt-2 rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{requestError}</div>
       ) : null}
@@ -1310,12 +1329,25 @@ export function ZaraRefreshPanel({
   refreshing: boolean
   requestError: string | null
 }) {
-  if (authUser?.role !== 'owner') {
-    return null
+  const isOwner = authUser?.role === 'owner'
+
+  function showOwnerOnlyToast(event: { currentTarget: HTMLElement }) {
+    if (isOwner) return
+    event.currentTarget.querySelector<HTMLElement>('[data-owner-only-toast]')?.removeAttribute('hidden')
+  }
+
+  function handleRefresh() {
+    if (!isOwner) return
+    onRefresh()
   }
 
   return (
-    <section className={HOTBOARD_COMPACT_PANEL_CLASS} style={HOTBOARD_CARD_STYLE}>
+    <section
+      className={cn(HOTBOARD_COMPACT_PANEL_CLASS, !isOwner && 'cursor-not-allowed opacity-50')}
+      style={HOTBOARD_CARD_STYLE}
+      data-testid="zara-refresh-panel"
+      onClick={showOwnerOnlyToast}
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[11px] tracking-[0.28em] text-slate-500" style={EDITORIAL_MONO_STYLE}>CURATED REFRESH</div>
@@ -1329,14 +1361,19 @@ export function ZaraRefreshPanel({
       <div className="mt-3">
         <button
           type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
+          onClick={handleRefresh}
+          disabled={!isOwner || refreshing}
           className={HOTBOARD_PRIMARY_BUTTON_CLASS}
+          title={isOwner ? '抓取并刷新 Zara feed' : 'owner 限定 · 联系 JC 手动刷新'}
+          aria-label={isOwner ? '抓取并刷新 Zara feed' : 'owner 限定 · 联系 JC 手动刷新'}
         >
-          {refreshing ? '刷新中...' : '刷新 Zara 源'}
+          {refreshing ? '刷新中...' : isOwner ? '刷新 Zara 源' : 'owner 限定 · 联系 JC 手动刷新'}
           <HugeiconsIcon icon={ArrowRight01Icon} size={16} strokeWidth={1.8} />
         </button>
       </div>
+      {!isOwner ? (
+        <div hidden data-owner-only-toast className="mt-2 rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">此功能仅限 owner, 请联系 JC</div>
+      ) : null}
       {requestError ? (
         <div className="mt-2 rounded-md border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{requestError}</div>
       ) : null}

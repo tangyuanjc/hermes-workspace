@@ -402,38 +402,51 @@ describe('owner-only source action panels', () => {
   const member = makeAuthUser({ id: 'paopao', role: 'member' })
   const owner = makeAuthUser({ id: 'jc', display_name: 'JC', role: 'owner' })
 
-  it('hides WeChat owner drop UI for members while keeping owner controls renderable', () => {
+  it('shows a disabled WeChat owner drop UI for members while keeping owner controls renderable', () => {
+    let submits = 0
     const props = {
       draftUrl: '',
       onDraftUrlChange: () => {},
-      onSubmit: () => {},
+      onSubmit: () => { submits += 1 },
       submitting: false,
       requestError: null,
     }
 
     const { rerender } = render(createElement(WechatIngestPanel, { ...props, authUser: member }))
-    expect(screen.queryByText(/当前账号为只读身份/)).toBeNull()
-    expect(screen.queryByText(/粘贴微信公众号文章 URL/)).toBeNull()
+    expect(screen.getByText('粘贴微信公众号文章 URL')).toBeTruthy()
+    expect(screen.getByPlaceholderText('owner 限定 · 联系 JC 开权限')).toBeTruthy()
+    expect(screen.getByPlaceholderText('owner 限定 · 联系 JC 开权限')).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByTestId('wechat-ingest-panel'))
+    expect(screen.getByText('此功能仅限 owner, 请联系 JC')).toBeTruthy()
+    expect(submits).toBe(0)
 
     rerender(createElement(WechatIngestPanel, { ...props, authUser: owner }))
     expect(screen.getByText('粘贴微信公众号文章 URL')).toBeTruthy()
+    expect(screen.getByPlaceholderText('https://mp.weixin.qq.com/s/...')).toHaveProperty('disabled', false)
 
     cleanup()
   })
 
-  it('hides Zara refresh locked card for members while keeping owner controls renderable', () => {
+  it('shows a disabled Zara refresh card for members while keeping owner controls renderable', () => {
+    let refreshes = 0
     const props = {
-      onRefresh: () => {},
+      onRefresh: () => { refreshes += 1 },
       refreshing: false,
       requestError: null,
     }
 
     const { rerender } = render(createElement(ZaraRefreshPanel, { ...props, authUser: member }))
-    expect(screen.queryByText('REFRESH LOCKED')).toBeNull()
-    expect(screen.queryByText(/当前账号为只读身份/)).toBeNull()
+    expect(screen.getByText('Zara YouTube 精选刷新')).toBeTruthy()
+    const memberButton = screen.getByRole('button', { name: 'owner 限定 · 联系 JC 手动刷新' })
+    expect(memberButton).toHaveProperty('disabled', true)
+    expect(memberButton.getAttribute('title')).toBe('owner 限定 · 联系 JC 手动刷新')
+    fireEvent.click(screen.getByTestId('zara-refresh-panel'))
+    expect(screen.getByText('此功能仅限 owner, 请联系 JC')).toBeTruthy()
+    expect(refreshes).toBe(0)
 
     rerender(createElement(ZaraRefreshPanel, { ...props, authUser: owner }))
     expect(screen.getByText('Zara YouTube 精选刷新')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '抓取并刷新 Zara feed' })).toHaveProperty('disabled', false)
 
     cleanup()
   })
