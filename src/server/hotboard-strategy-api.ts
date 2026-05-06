@@ -1,14 +1,11 @@
 import os from 'node:os'
 import path from 'node:path'
 import { json } from '@tanstack/react-start'
-import { z } from 'zod'
 import { isAuthenticated } from './auth-middleware'
 import {
+  normalizeStrategyLineKey,
   readStrategyStatusFromGlossary,
-  STRATEGY_LINE_KEYS,
 } from './hotboard-strategy-status'
-
-const LineSchema = z.enum(STRATEGY_LINE_KEYS)
 
 function resolveGlossaryPath() {
   const explicit = process.env.HOTBOARD_BUSINESS_GLOSSARY_PATH?.trim()
@@ -23,14 +20,13 @@ export async function handleHotboardStrategyGet(request: Request): Promise<Respo
 
   const url = new URL(request.url)
   const lineParam = url.searchParams.get('line') ?? 'm2-a'
-  const parsedLine = LineSchema.safeParse(lineParam)
+  const line = normalizeStrategyLineKey(lineParam)
 
-  if (!parsedLine.success) {
+  if (!line) {
     return json({ ok: false, error: 'Invalid line query parameter' }, { status: 400 })
   }
 
   try {
-    const line = parsedLine.data
     const items = readStrategyStatusFromGlossary({
       glossaryPath: resolveGlossaryPath(),
       lines: [line],

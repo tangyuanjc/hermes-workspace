@@ -4,6 +4,24 @@ export const STRATEGY_LINE_KEYS = ['m2-a', 'm2-b', 'm2-c', 'm2-d', 'm2-e'] as co
 
 export type StrategyLineKey = (typeof STRATEGY_LINE_KEYS)[number]
 
+const STRATEGY_LINE_ALIASES: Record<string, StrategyLineKey> = {
+  a: 'm2-a',
+  b: 'm2-b',
+  c: 'm2-c',
+  d: 'm2-d',
+  e: 'm2-e',
+  'm2-a': 'm2-a',
+  'm2-b': 'm2-b',
+  'm2-c': 'm2-c',
+  'm2-d': 'm2-d',
+  'm2-e': 'm2-e',
+}
+
+export function normalizeStrategyLineKey(input?: string | null): StrategyLineKey | null {
+  const value = (input || 'm2-a').trim().toLowerCase()
+  return STRATEGY_LINE_ALIASES[value] ?? null
+}
+
 export type StrategyStatusItem = {
   lineKey: StrategyLineKey
   code: string

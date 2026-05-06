@@ -82,6 +82,25 @@ describe('hotboard strategy api handler', () => {
     expect(payload.item.priority.length).toBeGreaterThan(0)
   })
 
+  it('accepts short strategy route params from /strategy/$line', async () => {
+    setupTempAuth()
+
+    const response = await handleHotboardStrategyGet(
+      makeRequest('http://localhost/api/hotboard/strategy?line=c'),
+    )
+
+    expect(response.status).toBe(200)
+    const payload = (await response.json()) as {
+      line: string
+      item: { lineKey: string; code: string; name: string }
+    }
+
+    expect(payload.line).toBe('m2-c')
+    expect(payload.item.lineKey).toBe('m2-c')
+    expect(payload.item.code).toBe('C线')
+    expect(payload.item.name).toBe('AI短视频→投流ROI')
+  })
+
   it('returns 400 for invalid line key', async () => {
     setupTempAuth()
 

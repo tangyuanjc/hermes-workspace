@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
   extractStrategyStatus,
+  normalizeStrategyLineKey,
   type StrategyLineKey,
 } from './hotboard-strategy-status'
 
 describe('hotboard strategy status reader', () => {
+  it('normalizes short route params to M2 strategy line keys', () => {
+    expect(normalizeStrategyLineKey('a')).toBe('m2-a')
+    expect(normalizeStrategyLineKey('c')).toBe('m2-c')
+    expect(normalizeStrategyLineKey('m2-e')).toBe('m2-e')
+    expect(normalizeStrategyLineKey('bad-line')).toBeNull()
+  })
+
   it('extracts owner and priority by strategy line from glossary markdown', () => {
     const markdown = `
 ## M2战略主线（2026-04-05起）

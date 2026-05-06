@@ -330,11 +330,11 @@ const INTAKE_ROUTE_ITEMS = [
 ] as const
 
 const STRATEGY_ROUTE_ITEMS = [
-  { key: 'm2-a', label: 'M2 A线 | 抓数稳定化', to: '/ai-hotboard/strategy/m2-a' },
-  { key: 'm2-b', label: 'M2 B线 | 财务报表自动化', to: '/ai-hotboard/strategy/m2-b' },
-  { key: 'm2-c', label: 'M2 C线 | AI短视频→投流ROI', to: '/ai-hotboard/strategy/m2-c' },
-  { key: 'm2-d', label: 'M2 D线 | 自动化有效率', to: '/ai-hotboard/strategy/m2-d' },
-  { key: 'm2-e', label: 'M2 E线 | 全员Agent协作', to: '/ai-hotboard/strategy/m2-e' },
+  { key: 'm2-a', label: 'M2 A线 | 抓数稳定化', to: '/ai-hotboard/strategy/a' },
+  { key: 'm2-b', label: 'M2 B线 | 财务报表自动化', to: '/ai-hotboard/strategy/b' },
+  { key: 'm2-c', label: 'M2 C线 | AI短视频→投流ROI', to: '/ai-hotboard/strategy/c' },
+  { key: 'm2-d', label: 'M2 D线 | 自动化有效率', to: '/ai-hotboard/strategy/d' },
+  { key: 'm2-e', label: 'M2 E线 | 全员Agent协作', to: '/ai-hotboard/strategy/e' },
 ] as const
 
 export const STRATEGY_LINES = STRATEGY_ROUTE_ITEMS.map((item) => item.label)
@@ -955,11 +955,13 @@ function strategyHighlightedKey(strategyLine: string) {
   return matched?.key
 }
 
-function resolveStrategyLineKey(input?: string) {
+export function resolveStrategyLineKey(input?: string) {
   const value = (input || 'm2-a').trim().toLowerCase()
-  if (value === 'm2-a' || value === 'm2-b' || value === 'm2-c' || value === 'm2-d' || value === 'm2-e') {
-    return value
-  }
+  if (value === 'a' || value === 'm2-a') return 'm2-a'
+  if (value === 'b' || value === 'm2-b') return 'm2-b'
+  if (value === 'c' || value === 'm2-c') return 'm2-c'
+  if (value === 'd' || value === 'm2-d') return 'm2-d'
+  if (value === 'e' || value === 'm2-e') return 'm2-e'
   return 'm2-a'
 }
 
