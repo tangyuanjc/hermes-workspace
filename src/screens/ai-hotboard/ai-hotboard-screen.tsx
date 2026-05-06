@@ -584,6 +584,10 @@ function isFeedPage(page: AiHotboardPage) {
   )
 }
 
+export function shouldShowExpandedFeedChrome(page: AiHotboardPage) {
+  return page === 'view-all' || page === 'view-low-follower'
+}
+
 function isPlaceholderSourcePage(page: AiHotboardPage): page is Extract<SourcePageKey, 'source-jc-human-talks'> {
   return page === 'source-jc-human-talks'
 }
@@ -2523,6 +2527,7 @@ export function AiHotboardScreen({
   const feedHeading = getFeedHeading(effectivePage)
   const visibleSystemNavItems = getVisibleSystemNavItems(authUser)
   const visibleRemoteSourceLabel = resolveVisibleSourceLabel(remoteSourceLabel, authUser)
+  const showExpandedFeedChrome = shouldShowExpandedFeedChrome(effectivePage)
 
   const renderMainPanel = () => {
     if (isPlaceholderSourcePage(effectivePage)) {
@@ -2668,40 +2673,42 @@ export function AiHotboardScreen({
 
     return (
       <>
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <HotboardStatCard
-            label="EVENTS"
-            value={feedStats.totalEvents}
-            icon={ActivitySparkIcon}
-            helper="实时进入看板的事件条目"
-            trendLabel="FLOW"
-            tone="cyan"
-          />
-          <HotboardStatCard
-            label="LIKES"
-            value={feedStats.totalLikes}
-            icon={AnalyticsUpIcon}
-            helper="点赞回流代表即时热度"
-            trendLabel="HEAT"
-            tone="emerald"
-          />
-          <HotboardStatCard
-            label="BOOKMARKS"
-            value={feedStats.totalBookmarks}
-            icon={Bookmark02Icon}
-            helper="收藏是更高意图的沉淀"
-            trendLabel="SAVE"
-            tone="amber"
-          />
-          <HotboardStatCard
-            label="AVG SIGNAL"
-            value={feedStats.averageSignalScore}
-            icon={AnalyticsUpIcon}
-            helper="综合信号强度均值"
-            trendLabel="HIGH"
-            tone="cyan"
-          />
-        </section>
+        {showExpandedFeedChrome ? (
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <HotboardStatCard
+              label="EVENTS"
+              value={feedStats.totalEvents}
+              icon={ActivitySparkIcon}
+              helper="实时进入看板的事件条目"
+              trendLabel="FLOW"
+              tone="cyan"
+            />
+            <HotboardStatCard
+              label="LIKES"
+              value={feedStats.totalLikes}
+              icon={AnalyticsUpIcon}
+              helper="点赞回流代表即时热度"
+              trendLabel="HEAT"
+              tone="emerald"
+            />
+            <HotboardStatCard
+              label="BOOKMARKS"
+              value={feedStats.totalBookmarks}
+              icon={Bookmark02Icon}
+              helper="收藏是更高意图的沉淀"
+              trendLabel="SAVE"
+              tone="amber"
+            />
+            <HotboardStatCard
+              label="AVG SIGNAL"
+              value={feedStats.averageSignalScore}
+              icon={AnalyticsUpIcon}
+              helper="综合信号强度均值"
+              trendLabel="HIGH"
+              tone="cyan"
+            />
+          </section>
+        ) : null}
 
         <FeedErrorBanners authCheckError={authCheckError} feedFetchError={feedFetchError} />
 
@@ -2805,17 +2812,26 @@ export function AiHotboardScreen({
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-[15px]">{feedHeading.subtitle}</p>
             </div>
             <div className="flex min-w-[19rem] flex-col gap-2 rounded-[20px] border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-              <div className="text-[11px] tracking-[0.2em] text-slate-500" style={EDITORIAL_MONO_STYLE}>LIVE META</div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500" style={EDITORIAL_MONO_STYLE}>更新时间</div>
-                  <div className="mt-1 text-slate-100">{formatGeneratedAt(remoteGeneratedAt)}</div>
+              {showExpandedFeedChrome ? (
+                <>
+                  <div className="text-[11px] tracking-[0.2em] text-slate-500" style={EDITORIAL_MONO_STYLE}>LIVE META</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500" style={EDITORIAL_MONO_STYLE}>更新时间</div>
+                      <div className="mt-1 text-slate-100">{formatGeneratedAt(remoteGeneratedAt)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500" style={EDITORIAL_MONO_STYLE}>数据来源</div>
+                      <div className="mt-1 truncate text-slate-100">{visibleRemoteSourceLabel}</div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="min-w-0 text-xs leading-5 text-slate-300">
+                  <div className="truncate tracking-[0.18em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>AI HOTBOARD / {feedHeading.title}</div>
+                  <div className="mt-1 truncate text-slate-400">更新 {formatGeneratedAt(remoteGeneratedAt)} · 来源 {visibleRemoteSourceLabel}</div>
                 </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500" style={EDITORIAL_MONO_STYLE}>数据来源</div>
-                  <div className="mt-1 truncate text-slate-100">{visibleRemoteSourceLabel}</div>
-                </div>
-              </div>
+              )}
               <div className="mt-1 flex items-center justify-between gap-2 rounded-[16px] border border-white/10 bg-slate-900/55 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                 <div className="min-w-0">
                   <div className="truncate text-sm text-slate-100">欢迎 {authUser?.display_name ?? '未登录'}</div>

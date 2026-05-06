@@ -2,7 +2,14 @@
 import { createElement } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { getVisibleSystemNavItems, IntakePanel, resolveVisibleSourceLabel, WechatIngestPanel, ZaraRefreshPanel } from './ai-hotboard-screen'
+import {
+  getVisibleSystemNavItems,
+  IntakePanel,
+  resolveVisibleSourceLabel,
+  shouldShowExpandedFeedChrome,
+  WechatIngestPanel,
+  ZaraRefreshPanel,
+} from './ai-hotboard-screen'
 import type { AuthUser } from '@/lib/hermes-auth'
 
 afterEach(() => {
@@ -36,6 +43,14 @@ describe('ai-hotboard member owner-card explainers', () => {
     expect(resolveVisibleSourceLabel('~/.org/shared-memory/business-glossary.md', member)).toBe('M2 业务主线表')
     expect(resolveVisibleSourceLabel('/Users/tangyuanjc/private/feed.json', member)).toBe('AI 热点看板信号池')
     expect(resolveVisibleSourceLabel('hotboard-wechat.sqlite', owner)).toBe('hotboard-wechat.sqlite')
+  })
+
+  it('keeps expanded KPI chrome only on all and low-follower views', () => {
+    expect(shouldShowExpandedFeedChrome('view-all')).toBe(true)
+    expect(shouldShowExpandedFeedChrome('view-low-follower')).toBe(true)
+    expect(shouldShowExpandedFeedChrome('view-bookmarks')).toBe(false)
+    expect(shouldShowExpandedFeedChrome('source-x-bookmarks')).toBe(false)
+    expect(shouldShowExpandedFeedChrome('system')).toBe(false)
   })
 
   it('renders intake as read-only for members without a create affordance', () => {
