@@ -12,7 +12,8 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { cn } from '@/lib/utils'
-import { fetchHermesAuthStatus, type AuthUser } from '@/lib/hermes-auth'
+import { type AuthUser } from '@/lib/hermes-auth'
+import { useAiHotboardAuth } from './ai-hotboard-auth'
 import {
   buildFeedFallbackPayload,
   mapFeedEventToMockEvent,
@@ -1701,12 +1702,9 @@ export function AiHotboardScreen({
   const resolvedSource = resolveSourceByHotboardPage(effectivePage, source)
   const normalizedSource = resolveFeedSourceForPage(effectivePage, toSupportedHotboardSource(resolvedSource))
   const feedMode = resolveFeedModeByPage(effectivePage)
+  const { authUser, authResolved, authRequired, authCheckError } = useAiHotboardAuth()
 
   const userIdRef = useRef<string>('unknown-user')
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
-  const [authResolved, setAuthResolved] = useState(false)
-  const [authRequired, setAuthRequired] = useState(false)
-  const [authCheckError, setAuthCheckError] = useState<string | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const [remotePayload, setRemotePayload] = useState<MockPayload>(EMPTY_MOCK_PAYLOAD)
@@ -2028,37 +2026,19 @@ export function AiHotboardScreen({
   }
 
   useEffect(() => {
-    let cancelled = false
-
-    async function loadAuthUser() {
-      try {
-        setAuthCheckError(null)
-        const auth = await fetchHermesAuthStatus()
-        if (cancelled) return
-
-        setAuthRequired(Boolean(auth.authRequired && !auth.authenticated))
-        if (auth.user?.feishu_open_id || auth.user?.email) {
-          const nextUserId = auth.user.feishu_open_id || auth.user.email || auth.user.id || 'unknown-user'
-          userIdRef.current = nextUserId
-          setSeenUserId(nextUserId)
-          setAuthUser(auth.user)
-        } else {
-          setAuthUser(null)
-          setSeenUserId('unknown-user')
-        }
-      } catch (error) {
-        console.error('[ai-hotboard] auth-check failed', error)
-        if (!cancelled) {
-          setAuthRequired(false)
-          setAuthUser(null)
-          setAuthCheckError(error instanceof Error ? error.message : 'auth check failed')
-        }
-      } finally {
-        if (!cancelled) {
-          setAuthResolved(true)
-        }
-      }
+    if (authUser?.feishu_open_id || authUser?.email) {
+      const nextUserId = authUser.feishu_open_id || authUser.email || authUser.id || 'unknown-user'
+      userIdRef.current = nextUserId
+      setSeenUserId(nextUserId)
+      return
     }
+
+    userIdRef.current = 'unknown-user'
+    setSeenUserId('unknown-user')
+  }, [authUser])
+
+  useEffect(() => {
+    let cancelled = false
 
     async function loadAggregate() {
       try {
@@ -2081,7 +2061,6 @@ export function AiHotboardScreen({
       }
     }
 
-    void loadAuthUser()
     void loadAggregate()
 
     return () => {

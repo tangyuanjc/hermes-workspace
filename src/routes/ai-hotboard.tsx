@@ -1,7 +1,8 @@
-import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { AiHotboardScreen } from '@/screens/ai-hotboard/ai-hotboard-screen'
+import { AiHotboardAuthProvider } from '@/screens/ai-hotboard/ai-hotboard-auth'
 import { type AiHotboardPage } from '@/screens/ai-hotboard/ai-hotboard-route-config'
 
 const HIDDEN_SELECTOR_PAIRS = [
@@ -22,7 +23,11 @@ export const Route = createFileRoute('/ai-hotboard')({
 })
 
 function AiHotboardLayout() {
-  return <Outlet />
+  return (
+    <AiHotboardAuthProvider>
+      <Outlet />
+    </AiHotboardAuthProvider>
+  )
 }
 
 export function usePrepareAiHotboardPage() {
