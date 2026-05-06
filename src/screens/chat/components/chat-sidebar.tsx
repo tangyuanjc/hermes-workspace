@@ -19,8 +19,8 @@ import {
   Search01Icon, Settings01Icon, Sun02Icon, UserGroupIcon, UserMultipleIcon
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { t } from '@/lib/i18n'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { DEFAULT_LOCALE, getLocale, translate, type LocaleId, type TranslationKey } from '@/lib/i18n'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   CHAT_OPEN_SETTINGS_EVENT
@@ -522,6 +522,22 @@ function ChatSidebarComponent({
       return state.location.pathname
     },
   })
+  const [navLocale, setNavLocale] = useState<LocaleId>(DEFAULT_LOCALE)
+
+  const navLabel = useCallback(
+    (key: TranslationKey) => translate(key, navLocale),
+    [navLocale],
+  )
+
+  useEffect(() => {
+    function syncLocale() {
+      setNavLocale(getLocale())
+    }
+
+    syncLocale()
+    window.addEventListener('locale-change', syncLocale)
+    return () => window.removeEventListener('locale-change', syncLocale)
+  }, [])
 
   useEffect(() => {
     function handleOpenSettingsEvent(event: Event) {
@@ -759,42 +775,42 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/dashboard',
       icon: DashboardSquare01Icon,
-      label: t('nav.dashboard'),
+      label: navLabel('nav.dashboard'),
       active: isDashboardActive,
     },
     {
       kind: 'link',
       to: '/chat',
       icon: MessageMultiple01Icon,
-      label: t('nav.chat'),
+      label: navLabel('nav.chat'),
       active: isChatActive,
     },
     {
       kind: 'link',
       to: '/files',
       icon: File01Icon,
-      label: t('nav.files'),
+      label: navLabel('nav.files'),
       active: isFilesActive,
     },
     {
       kind: 'link',
       to: '/terminal',
       icon: ComputerTerminal01Icon,
-      label: t('nav.terminal'),
+      label: navLabel('nav.terminal'),
       active: isTerminalActive,
     },
     {
       kind: 'link',
       to: '/jobs',
       icon: Clock01Icon,
-      label: t('nav.jobs'),
+      label: navLabel('nav.jobs'),
       active: isJobsActive,
     },
     {
       kind: 'link',
       to: '/tasks',
       icon: CheckListIcon,
-      label: t('nav.tasks'),
+      label: navLabel('nav.tasks'),
       active: isTasksActive,
     },
     {
@@ -818,14 +834,14 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/memory',
       icon: BrainIcon,
-      label: t('nav.memory'),
+      label: navLabel('nav.memory'),
       active: isMemoryActive,
     },
     {
       kind: 'link',
       to: '/skills',
       icon: PuzzleIcon,
-      label: t('nav.skills'),
+      label: navLabel('nav.skills'),
       active: isSkillsActive,
       dataTour: 'skills',
     },
@@ -833,7 +849,7 @@ function ChatSidebarComponent({
       kind: 'link',
       to: '/profiles',
       icon: UserMultipleIcon,
-      label: t('nav.profiles'),
+      label: navLabel('nav.profiles'),
       active: pathname === '/profiles',
     },
   ]

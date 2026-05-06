@@ -6,6 +6,7 @@
 export type LocaleId = 'en' | 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'ko' | 'pt' | 'ru' | 'ar'
 
 export type TranslationKey = keyof typeof EN
+type TranslationMap = { readonly [K in TranslationKey]: string }
 
 const EN = {
   // Nav
@@ -52,7 +53,7 @@ const EN = {
   'common.noData': 'No data',
 } as const
 
-const ES: typeof EN = {
+const ES: TranslationMap = {
   'nav.dashboard': 'Panel',
   'nav.chat': 'Chat',
   'nav.files': 'Archivos',
@@ -90,7 +91,7 @@ const ES: typeof EN = {
   'common.noData': 'Sin datos',
 }
 
-const FR: typeof EN = {
+const FR: TranslationMap = {
   'nav.dashboard': 'Tableau de bord',
   'nav.chat': 'Chat',
   'nav.files': 'Fichiers',
@@ -128,7 +129,7 @@ const FR: typeof EN = {
   'common.noData': 'Aucune donnée',
 }
 
-const ZH: typeof EN = {
+const ZH: TranslationMap = {
   'nav.dashboard': '仪表板',
   'nav.chat': '聊天',
   'nav.files': '文件',
@@ -166,7 +167,7 @@ const ZH: typeof EN = {
   'common.noData': '暂无数据',
 }
 
-const LOCALES: Record<LocaleId, typeof EN> = {
+const LOCALES: Record<LocaleId, TranslationMap> = {
   en: EN, es: ES, fr: FR, de: EN, zh: ZH, ja: EN, ko: EN, pt: EN, ru: EN, ar: EN,
 }
 
@@ -183,15 +184,20 @@ export const LOCALE_LABELS: Record<LocaleId, string> = {
   ar: 'العربية',
 }
 
+export const DEFAULT_LOCALE: LocaleId = 'en'
 const STORAGE_KEY = 'hermes-workspace-locale'
 
+export function translate(key: TranslationKey, locale: LocaleId = DEFAULT_LOCALE): string {
+  return LOCALES[locale]?.[key] ?? LOCALES[DEFAULT_LOCALE][key] ?? key
+}
+
 export function getLocale(): LocaleId {
-  if (typeof window === 'undefined') return 'en'
+  if (typeof window === 'undefined') return DEFAULT_LOCALE
   const stored = localStorage.getItem(STORAGE_KEY)
   if (stored && stored in LOCALES) return stored as LocaleId
   const browser = navigator.language.split('-')[0]
   if (browser in LOCALES) return browser as LocaleId
-  return 'en'
+  return DEFAULT_LOCALE
 }
 
 export function setLocale(id: LocaleId): void {
@@ -200,6 +206,5 @@ export function setLocale(id: LocaleId): void {
 }
 
 export function t(key: TranslationKey): string {
-  const locale = getLocale()
-  return LOCALES[locale]?.[key] ?? LOCALES.en[key] ?? key
+  return translate(key, getLocale())
 }
