@@ -64,6 +64,7 @@ type TimelineGroup = {
 }
 
 const DATA_SOURCE_LABEL = ['ai_hotboard', 'mock_events.json'].join('_')
+const STRATEGY_GLOSSARY_SOURCE_LABEL = '~/.org/shared-memory/business-glossary.md'
 const EMPTY_FEED_META: FeedMeta = { stale: false, partial_failures: [] }
 export const SEEN_EVENT_STORAGE_LIMIT = 1000
 export const SEEN_EVENT_DWELL_MS = 2500
@@ -357,12 +358,37 @@ const SYSTEM_NAV_ITEMS = [
   { key: 'logout', label: '退出', to: '/ai-hotboard/logout' },
 ] as const
 
+const MEMBER_SOURCE_LABELS: Record<string, string> = {
+  [DATA_SOURCE_LABEL]: 'AI 热点看板信号池',
+  x_signal_sync_latest: 'X 实时同步',
+  'x_signal_sync_latest.json': 'X 实时同步',
+  'hotboard-wechat.sqlite': '公众号手动池',
+  'hotboard-zara.sqlite': 'Zara YouTube 精选池',
+  [STRATEGY_GLOSSARY_SOURCE_LABEL]: 'M2 业务主线表',
+}
+
 export function canAccessOwnerHotboardPanels(authUser: Pick<AuthUser, 'role'> | null | undefined) {
   return authUser?.role === 'owner'
 }
 
 export function getVisibleSystemNavItems(authUser: Pick<AuthUser, 'role'> | null | undefined) {
   return canAccessOwnerHotboardPanels(authUser) ? SYSTEM_NAV_ITEMS : []
+}
+
+export function resolveVisibleSourceLabel(
+  rawLabel: string,
+  authUser: Pick<AuthUser, 'role'> | null | undefined,
+) {
+  if (canAccessOwnerHotboardPanels(authUser)) return rawLabel
+
+  const normalized = rawLabel.trim()
+  if (MEMBER_SOURCE_LABELS[normalized]) return MEMBER_SOURCE_LABELS[normalized]
+  if (normalized.includes('wechat')) return '公众号手动池'
+  if (normalized.includes('zara')) return 'Zara YouTube 精选池'
+  if (normalized.includes('x_signal') || normalized.includes('x-signal')) return 'X 实时同步'
+  if (normalized.includes('business-glossary')) return 'M2 业务主线表'
+  if (/\.json$|\.sqlite$|~\/|^\/Users\//.test(normalized)) return 'AI 热点看板信号池'
+  return normalized || 'AI 热点看板信号池'
 }
 
 export const SIDEBAR_NAV_SEQUENCE = [
@@ -1038,11 +1064,13 @@ function StrategyPanel({
   item,
   loading,
   error,
+  authUser,
 }: {
   strategyLine: string
   item: StrategyStatusItem | null
   loading: boolean
   error: string | null
+  authUser: AuthUser | null
 }) {
   const label = STRATEGY_ROUTE_ITEMS.find((route) => route.key === strategyLine)?.label ?? strategyLine
 
@@ -1075,7 +1103,7 @@ function StrategyPanel({
         <div className="mt-4 rounded-xl border border-slate-700/70 bg-slate-950/45 px-4 py-3 text-sm text-slate-300">当前主线暂无状态数据。</div>
       )}
 
-      <div className="mt-4 text-xs text-slate-400">状态来源：`~/.org/shared-memory/business-glossary.md`</div>
+      <div className="mt-4 text-xs text-slate-400">状态来源：{resolveVisibleSourceLabel(STRATEGY_GLOSSARY_SOURCE_LABEL, authUser)}</div>
     </section>
   )
 }
@@ -2492,6 +2520,7 @@ export function AiHotboardScreen({
 
   const feedHeading = getFeedHeading(effectivePage)
   const visibleSystemNavItems = getVisibleSystemNavItems(authUser)
+  const visibleRemoteSourceLabel = resolveVisibleSourceLabel(remoteSourceLabel, authUser)
 
   const renderMainPanel = () => {
     if (isPlaceholderSourcePage(effectivePage)) {
@@ -2552,6 +2581,7 @@ export function AiHotboardScreen({
           item={strategyStatus}
           loading={strategyStatusLoading}
           error={strategyStatusError}
+          authUser={authUser}
         />
       )
     }
@@ -2781,7 +2811,7 @@ export function AiHotboardScreen({
                 </div>
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500" style={EDITORIAL_MONO_STYLE}>数据来源</div>
-                  <div className="mt-1 truncate text-slate-100">{remoteSourceLabel}</div>
+                  <div className="mt-1 truncate text-slate-100">{visibleRemoteSourceLabel}</div>
                 </div>
               </div>
               <div className="mt-1 flex items-center justify-between gap-2 rounded-[16px] border border-white/10 bg-slate-900/55 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">

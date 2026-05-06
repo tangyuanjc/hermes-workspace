@@ -2,7 +2,7 @@
 import { createElement } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { getVisibleSystemNavItems, IntakePanel, WechatIngestPanel, ZaraRefreshPanel } from './ai-hotboard-screen'
+import { getVisibleSystemNavItems, IntakePanel, resolveVisibleSourceLabel, WechatIngestPanel, ZaraRefreshPanel } from './ai-hotboard-screen'
 import type { AuthUser } from '@/lib/hermes-auth'
 
 afterEach(() => {
@@ -28,6 +28,14 @@ describe('ai-hotboard member owner-card explainers', () => {
   it('hides backend nav items from members', () => {
     expect(getVisibleSystemNavItems(member).map((item) => item.label)).toEqual([])
     expect(getVisibleSystemNavItems(owner).map((item) => item.label)).toEqual(['系统', '用户', '信源健康', '退出'])
+  })
+
+  it('maps internal source labels for members while preserving owner raw labels', () => {
+    expect(resolveVisibleSourceLabel('x_signal_sync_latest.json', member)).toBe('X 实时同步')
+    expect(resolveVisibleSourceLabel('hotboard-wechat.sqlite', member)).toBe('公众号手动池')
+    expect(resolveVisibleSourceLabel('~/.org/shared-memory/business-glossary.md', member)).toBe('M2 业务主线表')
+    expect(resolveVisibleSourceLabel('/Users/tangyuanjc/private/feed.json', member)).toBe('AI 热点看板信号池')
+    expect(resolveVisibleSourceLabel('hotboard-wechat.sqlite', owner)).toBe('hotboard-wechat.sqlite')
   })
 
   it('renders intake as read-only for members without a create affordance', () => {
