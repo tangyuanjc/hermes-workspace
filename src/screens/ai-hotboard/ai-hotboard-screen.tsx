@@ -357,6 +357,14 @@ const SYSTEM_NAV_ITEMS = [
   { key: 'logout', label: '退出', to: '/ai-hotboard/logout' },
 ] as const
 
+export function canAccessOwnerHotboardPanels(authUser: Pick<AuthUser, 'role'> | null | undefined) {
+  return authUser?.role === 'owner'
+}
+
+export function getVisibleSystemNavItems(authUser: Pick<AuthUser, 'role'> | null | undefined) {
+  return canAccessOwnerHotboardPanels(authUser) ? SYSTEM_NAV_ITEMS : []
+}
+
 export const SIDEBAR_NAV_SEQUENCE = [
   ...PRIMARY_NAV_ITEMS.map((item) => item.label),
   '信源',
@@ -1072,7 +1080,7 @@ function StrategyPanel({
   )
 }
 
-function IntakePanel({
+export function IntakePanel({
   authorAgent,
   title,
   authUser,
@@ -1166,11 +1174,20 @@ function IntakePanel({
           ) : null}
 
           <div className="rounded-[22px] border border-white/10 bg-slate-950/50 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-            <div className="text-sm font-medium text-slate-100">新增提报</div>
             {!canWrite ? (
-              <div className="mt-2 rounded-md border border-slate-700/70 bg-slate-900/70 px-3 py-2 text-sm text-slate-300">当前账号为员工只读身份，写入入口仅对 agent 开放。</div>
+              <div className="rounded-md border border-slate-700/70 bg-slate-900/70 px-3 py-3 text-sm leading-6 text-slate-300">
+                <div className="font-medium text-slate-100">只读列表</div>
+                <p className="mt-1">当前账号为员工只读身份，可查看提报列表，不能新增或编辑提报。</p>
+                <a
+                  href="https://applink.feishu.cn/client/chat/open?openId=ou_01e621b00ca6ba95e9a1e10bb444c9ae"
+                  className="mt-2 inline-flex text-cyan-200 underline decoration-cyan-300/40 underline-offset-4 hover:text-cyan-100"
+                >
+                  联系 JC 申请 owner 权限
+                </a>
+              </div>
             ) : (
               <div className="mt-3 space-y-2">
+                <div className="text-sm font-medium text-slate-100">新增提报</div>
                 <input
                   type="text"
                   value={draft.title}
@@ -1451,11 +1468,29 @@ function BasicPagePanel({
   page,
   onLogout,
   isLoggingOut,
+  authUser,
 }: {
   page: AiHotboardPage
   onLogout: () => void
   isLoggingOut: boolean
+  authUser: AuthUser | null
 }) {
+  if ((page === 'system' || page === 'user') && !canAccessOwnerHotboardPanels(authUser)) {
+    return (
+      <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
+        <div className="text-[11px] tracking-[0.26em] text-amber-300/80" style={EDITORIAL_MONO_STYLE}>OWNER ONLY</div>
+        <h2 className="mt-2 text-[2.2rem] leading-none text-slate-100" style={EDITORIAL_DISPLAY_STYLE}>需要 owner 权限</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-300">当前账号为员工只读身份，后台页面仅对 owner 开放。</p>
+        <a
+          href="https://applink.feishu.cn/client/chat/open?openId=ou_01e621b00ca6ba95e9a1e10bb444c9ae"
+          className="mt-4 inline-flex text-sm text-cyan-200 underline decoration-cyan-300/40 underline-offset-4 hover:text-cyan-100"
+        >
+          联系 JC 申请 owner 权限
+        </a>
+      </section>
+    )
+  }
+
   if (page === 'system') {
     return (
       <section className={HOTBOARD_SECTION_CLASS} style={HOTBOARD_CARD_STYLE}>
@@ -2456,6 +2491,7 @@ export function AiHotboardScreen({
   }
 
   const feedHeading = getFeedHeading(effectivePage)
+  const visibleSystemNavItems = getVisibleSystemNavItems(authUser)
 
   const renderMainPanel = () => {
     if (isPlaceholderSourcePage(effectivePage)) {
@@ -2525,7 +2561,7 @@ export function AiHotboardScreen({
     }
 
     if (effectivePage === 'system' || effectivePage === 'user' || effectivePage === 'logout') {
-      return <BasicPagePanel page={effectivePage} onLogout={() => { void handleLogout() }} isLoggingOut={isLoggingOut} />
+      return <BasicPagePanel page={effectivePage} onLogout={() => { void handleLogout() }} isLoggingOut={isLoggingOut} authUser={authUser} />
     }
 
     if (effectivePage === 'source-wechat') {
@@ -2715,8 +2751,12 @@ export function AiHotboardScreen({
               testId="strategy-iteration-section"
             />
 
-            <div className="px-1 text-xs tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>后台</div>
-            <LinkNavItems items={SYSTEM_NAV_ITEMS} highlightedKey={systemPageHighlightedNavKey(effectivePage)} />
+            {visibleSystemNavItems.length > 0 ? (
+              <>
+                <div className="px-1 text-xs tracking-[0.24em] text-slate-500" style={EDITORIAL_MONO_STYLE}>后台</div>
+                <LinkNavItems items={visibleSystemNavItems} highlightedKey={systemPageHighlightedNavKey(effectivePage)} />
+              </>
+            ) : null}
           </nav>
         </aside>
 

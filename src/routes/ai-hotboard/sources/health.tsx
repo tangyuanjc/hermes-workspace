@@ -2,6 +2,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePrepareAiHotboardPage } from '../../ai-hotboard'
 import { cn } from '@/lib/utils'
+import { useAiHotboardAuth } from '@/screens/ai-hotboard/ai-hotboard-auth'
+import { canAccessOwnerHotboardPanels } from '@/screens/ai-hotboard/ai-hotboard-screen'
 
 type SourceHealthEntry = {
   id: string
@@ -17,13 +19,6 @@ type SourceHealthEntry = {
 
 type HealthPayload = {
   sources: SourceHealthEntry[]
-}
-
-type AuthCheckPayload = {
-  authenticated?: boolean
-  user?: {
-    role?: string
-  } | null
 }
 
 const STATUS_LABELS = {
@@ -68,11 +63,12 @@ function formatRelativeTime(value: string | null) {
 
 function SourceHealthRoute() {
   usePrepareAiHotboardPage()
+  const { authUser, authResolved } = useAiHotboardAuth()
+  const isOwner = canAccessOwnerHotboardPanels(authUser)
   const [sources, setSources] = useState<SourceHealthEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
-  const [isOwner, setIsOwner] = useState(false)
 
   const fetchHealth = useCallback(async () => {
     setLoading(true)
@@ -90,23 +86,14 @@ function SourceHealthRoute() {
   }, [])
 
   useEffect(() => {
-    void fetchHealth()
-  }, [fetchHealth])
-
-  useEffect(() => {
-    async function fetchAuthCheck() {
-      try {
-        const response = await fetch('/api/auth-check')
-        if (!response.ok) return
-        const payload = await response.json() as AuthCheckPayload
-        setIsOwner(Boolean(payload.authenticated && payload.user?.role === 'owner'))
-      } catch {
-        setIsOwner(false)
-      }
+    if (!authResolved) return
+    if (!isOwner) {
+      setLoading(false)
+      return
     }
 
-    void fetchAuthCheck()
-  }, [])
+    void fetchHealth()
+  }, [authResolved, fetchHealth, isOwner])
 
   const statusSummary = useMemo(() => {
     return sources.reduce<Record<SourceHealthEntry['status'], number>>((acc, source) => {
@@ -116,6 +103,7 @@ function SourceHealthRoute() {
   }, [sources])
 
   async function retryNow(sourceId: string) {
+    if (!isOwner) return
     setRetryingId(sourceId)
     setError(null)
     try {
@@ -131,6 +119,39 @@ function SourceHealthRoute() {
     } finally {
       setRetryingId(null)
     }
+  }
+
+  if (!authResolved) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-5 py-6 text-slate-100 sm:px-8 lg:px-10">
+        <section className="mx-auto max-w-6xl rounded-[28px] border border-white/10 bg-slate-900/80 p-6 text-slate-300 shadow-[0_24px_72px_rgba(2,6,23,0.52)]">
+          正在检查权限...
+        </section>
+      </main>
+    )
+  }
+
+  if (!isOwner) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-5 py-6 text-slate-100 sm:px-8 lg:px-10">
+        <section className="mx-auto max-w-6xl rounded-[28px] border border-white/10 bg-slate-900/80 p-6 shadow-[0_24px_72px_rgba(2,6,23,0.52)]">
+          <div className="text-[11px] tracking-[0.3em] text-amber-300/80">OWNER ONLY</div>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">需要 owner 权限</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">信源健康包含内部触发器和运行细节，仅对 owner 开放。</p>
+          <a
+            href="https://applink.feishu.cn/client/chat/open?openId=ou_01e621b00ca6ba95e9a1e10bb444c9ae"
+            className="mt-4 inline-flex text-sm text-cyan-200 underline decoration-cyan-300/40 underline-offset-4 hover:text-cyan-100"
+          >
+            联系 JC 申请 owner 权限
+          </a>
+          <div className="mt-4">
+            <Link to="/ai-hotboard" className="rounded-2xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:border-cyan-300/40 hover:text-white">
+              返回热榜
+            </Link>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   return (

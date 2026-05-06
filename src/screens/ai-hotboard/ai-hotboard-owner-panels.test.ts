@@ -2,7 +2,7 @@
 import { createElement } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { WechatIngestPanel, ZaraRefreshPanel } from './ai-hotboard-screen'
+import { getVisibleSystemNavItems, IntakePanel, WechatIngestPanel, ZaraRefreshPanel } from './ai-hotboard-screen'
 import type { AuthUser } from '@/lib/hermes-auth'
 
 afterEach(() => {
@@ -23,6 +23,35 @@ function makeAuthUser(overrides: Partial<AuthUser> & Pick<AuthUser, 'id' | 'role
 
 describe('ai-hotboard member owner-card explainers', () => {
   const member = makeAuthUser({ id: 'member', role: 'member' })
+  const owner = makeAuthUser({ id: 'owner', role: 'owner' })
+
+  it('hides backend nav items from members', () => {
+    expect(getVisibleSystemNavItems(member).map((item) => item.label)).toEqual([])
+    expect(getVisibleSystemNavItems(owner).map((item) => item.label)).toEqual(['系统', '用户', '信源健康', '退出'])
+  })
+
+  it('renders intake as read-only for members without a create affordance', () => {
+    render(createElement(IntakePanel, {
+      authorAgent: 'hermes',
+      title: '爱马仕战略发现',
+      authUser: member,
+      items: [],
+      selectedItemId: null,
+      onSelectItem: () => {},
+      draft: { title: '', body: '', tagsText: '' },
+      onDraftChange: () => {},
+      onSubmit: () => {},
+      submitting: false,
+      requestError: null,
+      listLoading: false,
+      listError: null,
+    }))
+
+    expect(screen.getByText('只读列表')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '联系 JC 申请 owner 权限' })).toBeTruthy()
+    expect(screen.queryByText('新增提报')).toBeNull()
+    expect(screen.queryByRole('button', { name: '提交提报' })).toBeNull()
+  })
 
   it('renders the WeChat ingest card disabled for members without firing submit', () => {
     let submits = 0
