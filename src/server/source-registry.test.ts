@@ -107,6 +107,25 @@ describe('source registry health', () => {
     expect(sources.find((source) => source.id === 'x-signal')?.count).toBe(5)
     expect(sources.find((source) => source.id === 'jc-conversations')?.status).toBe('yellow')
   })
+
+  it('counts nested x signal totals from the latest payload', async () => {
+    const dir = makeTempDir()
+    const xSignalLatestPath = path.join(dir, 'x_signal_sync_latest.json')
+    fs.writeFileSync(xSignalLatestPath, JSON.stringify({
+      generated_at: '2026-04-26T10:00:00.000Z',
+      counts: {
+        bookmarks: { total: 73, by_user: { tangyuanjc: 73 } },
+        likes: { total: 0, by_user: { tangyuanjc: 0 } },
+      },
+    }))
+
+    const sources = await listSourceHealth({
+      xSignalLatestPath,
+      now: () => new Date('2026-04-26T12:00:00.000Z'),
+    })
+
+    expect(sources.find((source) => source.id === 'x-signal')?.count).toBe(73)
+  })
 })
 
 describe('source retry rate limit', () => {

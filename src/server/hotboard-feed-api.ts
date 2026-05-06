@@ -39,6 +39,14 @@ type FeedMeta = {
   partial_failures: string[]
 }
 
+type FeedResult = {
+  generated_at: string
+  data_source: string
+  fallback: boolean
+  meta: FeedMeta
+  events: HotboardFeedEvent[]
+}
+
 type MockEvent = {
   id: string
   timestamp: string
@@ -230,13 +238,27 @@ function emptyMeta(): FeedMeta {
   return { stale: false, partial_failures: [] }
 }
 
-function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
+function shouldEnableMockFallback() {
+  return process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK === '1'
+}
+
+function emptyXFeedResult(xSignalPath: string, reason?: string): FeedResult {
+  return {
+    generated_at: new Date().toISOString(),
+    data_source: path.basename(xSignalPath),
+    fallback: false,
+    meta: reason ? { stale: false, partial_failures: [reason] } : emptyMeta(),
+    events: [],
+  }
+}
+
+function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT): FeedResult {
   const xSignalPath = resolveXSignalPath()
-  if (!fs.existsSync(xSignalPath)) return null
+  if (!fs.existsSync(xSignalPath)) return emptyXFeedResult(xSignalPath, 'missing_x_signal_latest')
 
   const raw = fs.readFileSync(xSignalPath, 'utf-8')
   const parsed = parseXSignalPayload(raw)
-  if (!parsed) return null
+  if (!parsed) return emptyXFeedResult(xSignalPath, 'invalid_x_signal_latest')
 
   const build = (key: XEventSource) => {
     const items = (parsed[SOURCE_MAP[key]] ?? []) as XTweet[]
@@ -249,8 +271,6 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
       : source === 'low-follower'
         ? lowFollowerFilter(SOURCE_KEYS.flatMap((key) => build(key)))
       : build(source)
-
-  if (events.length === 0) return null
 
   return {
     generated_at: parsed.generated_at ?? new Date().toISOString(),
@@ -344,7 +364,7 @@ export async function handleHotboardFeedGet(request: Request): Promise<Response>
 
   const source = parsedSource.data as XSignalSource
   const xFeed = loadXFeedEvents(source)
-  const result = xFeed ?? loadFallbackEvents(source)
+  const result = xFeed.events.length === 0 && shouldEnableMockFallback() ? loadFallbackEvents(source) : xFeed
 
   return json({
     ok: true,

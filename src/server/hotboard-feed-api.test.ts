@@ -8,6 +8,7 @@ import { handleHotboardFeedGet, lowFollowerFilter } from './hotboard-feed-api'
 const tempDirs: string[] = []
 const originalXFeedPath = process.env.HOTBOARD_X_SIGNAL_PATH
 const originalAuthDbPath = process.env.HERMES_AUTH_DB_PATH
+const originalMockFallback = process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK
 
 afterEach(() => {
   if (originalXFeedPath === undefined) {
@@ -20,6 +21,12 @@ afterEach(() => {
     delete process.env.HERMES_AUTH_DB_PATH
   } else {
     process.env.HERMES_AUTH_DB_PATH = originalAuthDbPath
+  }
+
+  if (originalMockFallback === undefined) {
+    delete process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK
+  } else {
+    process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK = originalMockFallback
   }
 
   while (tempDirs.length > 0) {
@@ -415,8 +422,32 @@ describe('hotboard feed api handlers', () => {
     expect(payload.meta.partial_failures).toEqual([])
   })
 
+  it('does not fall back to mock data for x-bookmarks when the x signal file is missing', async () => {
+    const tempDir = setupTempAuth()
+    process.env.HOTBOARD_X_SIGNAL_PATH = path.join(tempDir, 'x_signal_sync_latest.json')
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    expect(response.status).toBe(200)
+
+    const payload = (await response.json()) as {
+      ok: boolean
+      fallback: boolean
+      data_source: string
+      meta: { stale: boolean; partial_failures: string[] }
+      count: number
+      events: Array<Record<string, unknown>>
+    }
+
+    expect(payload.ok).toBe(true)
+    expect(payload.fallback).toBe(false)
+    expect(payload.data_source).toBe('x_signal_sync_latest.json')
+    expect(payload.count).toBe(0)
+    expect(payload.events).toEqual([])
+  })
+
   it('falls back to mock data when x feed file is missing', async () => {
     setupTempAuth()
+    process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK = '1'
     process.env.HOTBOARD_X_SIGNAL_PATH = path.join(os.tmpdir(), 'missing-hotboard-feed.json')
     const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-following'))
     expect(response.status).toBe(200)
@@ -425,6 +456,7 @@ describe('hotboard feed api handlers', () => {
       ok: boolean
       fallback: boolean
       data_source: string
+      meta: { stale: boolean; partial_failures: string[] }
       count: number
       events: Array<Record<string, unknown>>
     }

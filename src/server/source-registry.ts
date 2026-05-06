@@ -166,17 +166,17 @@ function readXSignalHealth(filePath: string, nowMs: number) {
   try {
     const payload = JSON.parse(fs.readFileSync(filePath, 'utf8')) as {
       generated_at?: string
-      counts?: Record<string, number>
+      counts?: Record<string, unknown>
       count?: number
       total?: number
       last_failure_at?: string | null
       last_failure_reason?: string | null
     }
-    const count = typeof payload.count === 'number'
+    const count: number = typeof payload.count === 'number'
       ? payload.count
       : typeof payload.total === 'number'
         ? payload.total
-        : Object.values(payload.counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
+        : sumXSignalCounts(payload.counts ?? {})
 
     return calculateSourceHealth({
       intervalMs: X_SIGNAL_INTERVAL_MS,
@@ -196,6 +196,19 @@ function readXSignalHealth(filePath: string, nowMs: number) {
       status: 'red' as const,
     }
   }
+}
+
+function readXSignalCountValue(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (value && typeof value === 'object') {
+    const total = (value as { total?: unknown }).total
+    if (typeof total === 'number' && Number.isFinite(total)) return total
+  }
+  return 0
+}
+
+function sumXSignalCounts(counts: Record<string, unknown>): number {
+  return Object.values(counts).reduce<number>((sum, value) => sum + readXSignalCountValue(value), 0)
 }
 
 function openRetryDb(dbPath: string) {
