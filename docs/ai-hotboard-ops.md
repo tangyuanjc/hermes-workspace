@@ -21,6 +21,7 @@
 - The script is `scripts/monitor-aihotboard.sh` and must stay `chmod 700`.
 - It checks `launchctl print gui/$(id -u)/ai.hermes.aihotboard` for `state = running`.
 - It probes `http://localhost:3000/ai-hotboard` and expects HTTP `200`.
+- It also invokes `scripts/monitor-x-signal-sync.sh` at most once every 30 minutes so the already-loaded monitor can guard X sync payload size and launchd path drift.
 - State is stored as `state,failure_count,window_start` at `~/.hermes/data/.aihotboard-monitor-state` with `chmod 600`.
 - Alert transition: previous `ok` to current failure sends one Feishu IM.
 - Recovery transition: previous `alert` to current healthy sends one Feishu IM.

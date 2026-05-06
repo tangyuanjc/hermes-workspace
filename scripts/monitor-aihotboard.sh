@@ -10,9 +10,38 @@ ALERT_USER_ID="${AIHOTBOARD_ALERT_USER_ID:-ou_a06ae3d7885f83839917ac0f44e46247}"
 SERVICE_LABEL="${AIHOTBOARD_SERVICE_LABEL:-ai.hermes.aihotboard}"
 HEALTH_URL="${AIHOTBOARD_HEALTH_URL:-http://localhost:3000/ai-hotboard}"
 THROTTLE_SECONDS="${AIHOTBOARD_ALERT_THROTTLE_SECONDS:-3600}"
+X_SIGNAL_MONITOR_ENABLED="${X_SIGNAL_MONITOR_ENABLED:-1}"
+X_SIGNAL_MONITOR_INTERVAL_SECONDS="${X_SIGNAL_MONITOR_INTERVAL_SECONDS:-1800}"
+X_SIGNAL_MONITOR_LAST_RUN_FILE="${X_SIGNAL_MONITOR_LAST_RUN_FILE:-$HOME/.hermes/data/.x-signal-monitor-last-run}"
+X_SIGNAL_MONITOR_SCRIPT="${X_SIGNAL_MONITOR_SCRIPT:-/Users/tangyuanjc/hermes-workspace/scripts/monitor-x-signal-sync.sh}"
 
 mkdir -p "$(dirname "$STATE_FILE")" "$LOG_DIR"
 chmod 700 "$(dirname "$STATE_FILE")" "$LOG_DIR" 2>/dev/null || true
+
+case "$X_SIGNAL_MONITOR_INTERVAL_SECONDS" in ''|*[!0-9]*) X_SIGNAL_MONITOR_INTERVAL_SECONDS=1800 ;; esac
+
+run_x_signal_monitor_if_due() {
+  [ "$X_SIGNAL_MONITOR_ENABLED" = "1" ] || return 0
+  [ -x "$X_SIGNAL_MONITOR_SCRIPT" ] || return 0
+
+  local now last_run
+  now="$(date +%s)"
+  last_run="$(stat -f %m "$X_SIGNAL_MONITOR_LAST_RUN_FILE" 2>/dev/null || stat -c %Y "$X_SIGNAL_MONITOR_LAST_RUN_FILE" 2>/dev/null || echo 0)"
+  case "$last_run" in ''|*[!0-9]*) last_run=0 ;; esac
+  if [ $((now - last_run)) -lt "$X_SIGNAL_MONITOR_INTERVAL_SECONDS" ]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$X_SIGNAL_MONITOR_LAST_RUN_FILE")"
+  if "$X_SIGNAL_MONITOR_SCRIPT" >> "$LOG_DIR/x-signal-monitor.out.log" 2>> "$LOG_DIR/x-signal-monitor.err.log"; then
+    touch "$X_SIGNAL_MONITOR_LAST_RUN_FILE"
+    chmod 600 "$X_SIGNAL_MONITOR_LAST_RUN_FILE" 2>/dev/null || true
+  else
+    echo "x-signal monitor failed" >&2
+  fi
+}
+
+run_x_signal_monitor_if_due
 
 STATUS="$(launchctl print "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null | awk '$1 == "state" && $2 == "=" { print $3; exit }')"
 [ -n "$STATUS" ] || STATUS="missing"

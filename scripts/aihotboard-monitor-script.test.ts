@@ -29,6 +29,7 @@ describe('monitor-aihotboard.sh', () => {
           AIHOTBOARD_MONITOR_STATE_FILE: stateFile,
           HERMES_LOG_DIR: path.join(tempDir, 'logs'),
           LARK_CLI: larkCli,
+          X_SIGNAL_MONITOR_ENABLED: '0',
           AIHOTBOARD_HEALTH_URL: 'http://127.0.0.1:1/always-fail',
           PATH: `${binDir}:${process.env.PATH}`,
         },
@@ -56,6 +57,7 @@ describe('monitor-aihotboard.sh', () => {
       AIHOTBOARD_ALERT_THROTTLE_SECONDS: '0',
       HERMES_LOG_DIR: path.join(tempDir, 'logs'),
       LARK_CLI: larkCli,
+      X_SIGNAL_MONITOR_ENABLED: '0',
       AIHOTBOARD_HEALTH_URL: 'http://127.0.0.1:1/always-fail',
       PATH: `${binDir}:${process.env.PATH}`,
     }
