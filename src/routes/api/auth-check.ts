@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import {
-  getSessionUser,
+  getSessionWithUser,
   isAuthenticated,
   isEmailAuthEnabled,
   isFeishuSsoEnabled,
@@ -29,8 +29,9 @@ export const Route = createFileRoute('/api/auth-check')({
           isPasswordProtectionEnabled() ||
           isFeishuSsoEnabled() ||
           isEmailAuthEnabled()
-        const authenticated = isAuthenticated(request)
-        const user = authenticated ? getSessionUser(request) : null
+        const session = isAuthenticated(request) ? getSessionWithUser(request) : null
+        const authenticated = session !== null
+        const user = session?.user ?? null
 
         const authMode = isEmailAuthEnabled()
           ? 'email_magic_link'
@@ -45,6 +46,9 @@ export const Route = createFileRoute('/api/auth-check')({
           authRequired,
           authMode,
           hermesGatewayReachable,
+          session_version: user
+            ? `${user.id}:${user.role}:${user.last_login_at}:${session?.expires_at ?? ''}`
+            : `anonymous:${authMode}`,
           user: user
             ? {
                 id: user.id,

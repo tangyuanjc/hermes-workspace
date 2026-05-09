@@ -13,7 +13,7 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { cn } from '@/lib/utils'
 import { type AuthUser } from '@/lib/hermes-auth'
-import { useAiHotboardAuth } from './ai-hotboard-auth'
+import { clearAiHotboardAuthCache, useAiHotboardAuth } from './ai-hotboard-auth'
 import {
   buildFeedFallbackPayload,
   mapFeedEventToMockEvent,
@@ -1771,7 +1771,7 @@ export function AiHotboardScreen({
   const resolvedSource = resolveSourceByHotboardPage(effectivePage, source)
   const normalizedSource = resolveFeedSourceForPage(effectivePage, toSupportedHotboardSource(resolvedSource))
   const feedMode = resolveFeedModeByPage(effectivePage)
-  const { authUser, authResolved, authRequired, authCheckError } = useAiHotboardAuth()
+  const { authUser, authResolved, authRequired, authCheckError, refreshAuth } = useAiHotboardAuth()
 
   const userIdRef = useRef<string>('unknown-user')
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -1837,6 +1837,7 @@ export function AiHotboardScreen({
     async function loadFeed() {
       if (!isFeedPage(effectivePage)) return
       if (isPlaceholderSourcePage(effectivePage)) return
+      if (!authResolved || authRequired || authCheckError) return
 
       if (effectivePage === 'source-wechat') {
         if (!cancelled) {
@@ -1956,6 +1957,11 @@ export function AiHotboardScreen({
         const response = await fetch(
           `/api/hotboard/feed?source=${encodeURIComponent(normalizedSource)}`,
         )
+        if (response.status === 401) {
+          clearAiHotboardAuthCache({ broadcast: true, reason: 'logout' })
+          window.location.href = '/ai-hotboard'
+          return
+        }
         if (!response.ok) throw new Error('feed request failed')
 
         const body = (await response.json().catch(() => ({}))) as {
@@ -2015,7 +2021,7 @@ export function AiHotboardScreen({
     return () => {
       cancelled = true
     }
-  }, [effectivePage, normalizedSource])
+  }, [authCheckError, authRequired, authResolved, effectivePage, normalizedSource])
 
   const timelineEvents = useMemo<TimelineEvent[]>(() => {
     return remotePayload.events
@@ -2238,6 +2244,7 @@ export function AiHotboardScreen({
       await fetch('/api/auth/logout', {
         method: 'POST',
       })
+      clearAiHotboardAuthCache({ broadcast: true, reason: 'logout' })
     } finally {
       window.location.href = '/ai-hotboard'
     }
@@ -2733,6 +2740,28 @@ export function AiHotboardScreen({
     return (
       <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950 text-slate-200">
         正在检查登录状态...
+      </div>
+    )
+  }
+
+  if (authCheckError) {
+    return (
+      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950 px-5 text-slate-100">
+        <section className="w-full max-w-lg rounded-[28px] border border-red-300/25 bg-slate-900/90 p-6 shadow-[0_24px_72px_rgba(2,6,23,0.52)]">
+          <div className="text-[11px] tracking-[0.3em] text-red-200/80">AUTH CHECK FAILED</div>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">身份核验失败</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-300">看板已暂停渲染, 请重试身份核验或联系 JC。</p>
+          <p className="mt-3 rounded-2xl border border-red-300/20 bg-red-400/10 px-3 py-2 text-xs text-red-100">
+            {authCheckError}
+          </p>
+          <button
+            type="button"
+            onClick={() => { void refreshAuth() }}
+            className={cn(HOTBOARD_SECONDARY_BUTTON_CLASS, 'mt-5 border-cyan-300/35 text-cyan-100 hover:border-cyan-200/60')}
+          >
+            重试身份核验
+          </button>
+        </section>
       </div>
     )
   }

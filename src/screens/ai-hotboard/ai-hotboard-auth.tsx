@@ -6,6 +6,7 @@ type AiHotboardAuthSnapshot = {
   authResolved: boolean
   authRequired: boolean
   authCheckError: string | null
+  sessionVersion: string
 }
 
 type AiHotboardAuthContextValue = AiHotboardAuthSnapshot & {
@@ -17,6 +18,7 @@ const UNRESOLVED_AUTH_SNAPSHOT: AiHotboardAuthSnapshot = {
   authResolved: false,
   authRequired: false,
   authCheckError: null,
+  sessionVersion: 'unresolved',
 }
 
 const AiHotboardAuthContext = createContext<AiHotboardAuthContextValue>({
@@ -25,7 +27,95 @@ const AiHotboardAuthContext = createContext<AiHotboardAuthContextValue>({
 })
 
 let cachedAuthSnapshot: AiHotboardAuthSnapshot | null = null
+let cachedAuthSnapshotFetchedAtMs = 0
 let pendingAuthSnapshot: Promise<AiHotboardAuthSnapshot> | null = null
+
+const DEFAULT_AUTH_CACHE_TTL_MS = 60_000
+const AUTH_SYNC_CHANNEL_NAME = 'ai-hotboard-auth'
+const AUTH_SYNC_STORAGE_KEY = 'ai-hotboard-auth-sync'
+
+type AuthSyncReason = 'logout' | 'role-change'
+
+type AuthSyncMessage = {
+  id: string
+  reason: AuthSyncReason
+  sessionVersion?: string
+  sentAt: number
+}
+
+function resolveAuthCacheTtlMs() {
+  const configured = Number.parseInt(import.meta.env.VITE_HOTBOARD_AUTH_CACHE_TTL_MS ?? '', 10)
+  if (Number.isFinite(configured) && configured >= 0) return configured
+  return DEFAULT_AUTH_CACHE_TTL_MS
+}
+
+function isCachedAuthSnapshotFresh() {
+  if (!cachedAuthSnapshot) return false
+  return Date.now() - cachedAuthSnapshotFetchedAtMs <= resolveAuthCacheTtlMs()
+}
+
+function buildSessionVersion(auth: Awaited<ReturnType<typeof fetchHermesAuthStatus>>) {
+  if (auth.session_version) return auth.session_version
+  if (!auth.authenticated || !auth.user) return `anonymous:${auth.authMode ?? 'unknown'}`
+  return `${auth.user.id}:${auth.user.role}`
+}
+
+function buildAuthErrorSnapshot(error: unknown): AiHotboardAuthSnapshot {
+  return {
+    authUser: null,
+    authResolved: true,
+    authRequired: true,
+    authCheckError: error instanceof Error ? error.message : 'auth check failed',
+    sessionVersion: `auth-error:${Date.now()}`,
+  }
+}
+
+function hasAuthIdentityChanged(previous: AiHotboardAuthSnapshot | null, next: AiHotboardAuthSnapshot) {
+  if (!previous) return false
+  if (previous.sessionVersion !== next.sessionVersion) return true
+  return (previous.authUser?.role ?? null) !== (next.authUser?.role ?? null)
+}
+
+function createAuthSyncMessage(reason: AuthSyncReason, sessionVersion?: string): AuthSyncMessage {
+  return {
+    id: `${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    reason,
+    sessionVersion,
+    sentAt: Date.now(),
+  }
+}
+
+function broadcastAuthSync(reason: AuthSyncReason, sessionVersion?: string) {
+  if (typeof window === 'undefined') return
+  const message = createAuthSyncMessage(reason, sessionVersion)
+
+  try {
+    const channel = new BroadcastChannel(AUTH_SYNC_CHANNEL_NAME)
+    channel.postMessage(message)
+    channel.close()
+  } catch {
+    // BroadcastChannel is best-effort; storage event below is the fallback.
+  }
+
+  try {
+    window.localStorage.setItem(AUTH_SYNC_STORAGE_KEY, JSON.stringify(message))
+  } catch {
+    // localStorage can be unavailable in private contexts.
+  }
+}
+
+export function clearAiHotboardAuthCache({
+  broadcast = false,
+  reason = 'logout',
+}: {
+  broadcast?: boolean
+  reason?: AuthSyncReason
+} = {}) {
+  cachedAuthSnapshot = null
+  cachedAuthSnapshotFetchedAtMs = 0
+  pendingAuthSnapshot = null
+  if (broadcast) broadcastAuthSync(reason)
+}
 
 function toAuthSnapshot(auth: Awaited<ReturnType<typeof fetchHermesAuthStatus>>): AiHotboardAuthSnapshot {
   return {
@@ -33,24 +123,32 @@ function toAuthSnapshot(auth: Awaited<ReturnType<typeof fetchHermesAuthStatus>>)
     authResolved: true,
     authRequired: Boolean(auth.authRequired && !auth.authenticated),
     authCheckError: null,
+    sessionVersion: buildSessionVersion(auth),
   }
 }
 
-async function fetchCachedAuthSnapshot({ force = false }: { force?: boolean } = {}) {
-  if (!force && cachedAuthSnapshot) return cachedAuthSnapshot
+export async function fetchCachedAuthSnapshot({ force = false }: { force?: boolean } = {}) {
+  if (!force && isCachedAuthSnapshotFresh() && cachedAuthSnapshot) return cachedAuthSnapshot
   if (!force && pendingAuthSnapshot) return pendingAuthSnapshot
+
+  const previousSnapshot = cachedAuthSnapshot
 
   pendingAuthSnapshot = fetchHermesAuthStatus()
     .then(toAuthSnapshot)
-    .catch((error): AiHotboardAuthSnapshot => ({
-      authUser: null,
-      authResolved: true,
-      authRequired: false,
-      authCheckError: error instanceof Error ? error.message : 'auth check failed',
-    }))
+    .catch((error): AiHotboardAuthSnapshot => {
+      const snapshot = buildAuthErrorSnapshot(error)
+      if (snapshot.authCheckError?.includes('HTTP 401')) {
+        broadcastAuthSync('logout')
+      }
+      return snapshot
+    })
     .then((snapshot) => {
       cachedAuthSnapshot = snapshot
+      cachedAuthSnapshotFetchedAtMs = Date.now()
       pendingAuthSnapshot = null
+      if (!snapshot.authCheckError && hasAuthIdentityChanged(previousSnapshot, snapshot)) {
+        broadcastAuthSync('role-change', snapshot.sessionVersion)
+      }
       return snapshot
     })
 
@@ -58,8 +156,7 @@ async function fetchCachedAuthSnapshot({ force = false }: { force?: boolean } = 
 }
 
 export function resetAiHotboardAuthCacheForTests() {
-  cachedAuthSnapshot = null
-  pendingAuthSnapshot = null
+  clearAiHotboardAuthCache()
 }
 
 export function AiHotboardAuthProvider({ children }: { children: ReactNode }) {
@@ -81,6 +178,73 @@ export function AiHotboardAuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    function revalidateOnFocus() {
+      if (document.visibilityState === 'hidden') return
+      void refreshAuth()
+    }
+
+    window.addEventListener('focus', revalidateOnFocus)
+    document.addEventListener('visibilitychange', revalidateOnFocus)
+
+    return () => {
+      window.removeEventListener('focus', revalidateOnFocus)
+      document.removeEventListener('visibilitychange', revalidateOnFocus)
+    }
+  }, [refreshAuth])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    let cancelled = false
+    let channel: BroadcastChannel | null = null
+
+    function handleAuthSync(message: AuthSyncMessage) {
+      clearAiHotboardAuthCache()
+      if (message.reason === 'logout') {
+        setAuthSnapshot({
+          authUser: null,
+          authResolved: true,
+          authRequired: true,
+          authCheckError: null,
+          sessionVersion: `logout:${message.sentAt}`,
+        })
+      }
+
+      void fetchCachedAuthSnapshot({ force: true }).then((snapshot) => {
+        if (!cancelled) setAuthSnapshot(snapshot)
+      })
+    }
+
+    try {
+      channel = new BroadcastChannel(AUTH_SYNC_CHANNEL_NAME)
+      channel.onmessage = (event: MessageEvent<AuthSyncMessage>) => {
+        handleAuthSync(event.data)
+      }
+    } catch {
+      channel = null
+    }
+
+    function handleStorage(event: StorageEvent) {
+      if (event.key !== AUTH_SYNC_STORAGE_KEY || !event.newValue) return
+      try {
+        handleAuthSync(JSON.parse(event.newValue) as AuthSyncMessage)
+      } catch {
+        // Ignore malformed cross-tab messages.
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('storage', handleStorage)
+      channel?.close()
     }
   }, [])
 

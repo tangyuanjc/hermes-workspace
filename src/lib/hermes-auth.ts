@@ -10,6 +10,7 @@ export interface AuthUser {
 export interface AuthStatus {
   authenticated: boolean
   authRequired: boolean
+  session_version?: string
   authMode?: 'none' | 'password' | 'feishu_sso' | 'email_magic_link'
   user?: AuthUser | null
   error?: string
