@@ -11,7 +11,9 @@ import {
   FeedMetaBanners,
   FeedTimeline,
   feedMatchesMode,
+  getEmptyStateCopy,
   getSeenEventStorageKey,
+  HotboardStatusChip,
   hashUserId,
   JcHumanTalksComingSoonCard,
   mergeSeenEventIds,
@@ -192,8 +194,7 @@ describe('ai-hotboard screen handoff constraints', () => {
     expect(meta.status).toBe('stale')
 
     render(createElement(FeedMetaBanners, { meta }))
-    expect(screen.getByText('数据源同步异常: missing_x_signal_latest')).toBeTruthy()
-    expect(screen.getByText('数据上次成功更新 3 小时前 (信源故障)')).toBeTruthy()
+    expect(screen.getByText('信源全部失败: missing_x_signal_latest · owner 可前往信源健康重试')).toBeTruthy()
   })
 })
 
@@ -403,7 +404,7 @@ describe('FeedMetaBanners', () => {
     render(createElement(FeedMetaBanners, { meta: normalizeFeedMeta(response.meta) }))
 
     expect(response.events).toHaveLength(0)
-    expect(screen.getByText('数据源同步异常: x:bookmarks')).toBeTruthy()
+    expect(screen.getByText('部分信源数据延迟: x:bookmarks')).toBeTruthy()
     expect(screen.getByText('数据超过新鲜度阈值, 可能过时')).toBeTruthy()
 
     cleanup()
@@ -412,7 +413,7 @@ describe('FeedMetaBanners', () => {
   it('surfaces partial failures and stale feed state', () => {
     render(createElement(FeedMetaBanners, { meta: { stale: true, partial_failures: ['jc:bookmarks', 'x:likes'] } }))
 
-    expect(screen.getByText('数据源同步异常: jc:bookmarks, x:likes')).toBeTruthy()
+    expect(screen.getByText('部分信源数据延迟: jc:bookmarks, x:likes')).toBeTruthy()
     expect(screen.getByText('数据超过新鲜度阈值, 可能过时')).toBeTruthy()
 
     cleanup()
@@ -422,6 +423,42 @@ describe('FeedMetaBanners', () => {
     render(createElement(FeedMetaBanners, { meta: { stale: true, partial_failures: [], freshness_hours: 1 } }))
 
     expect(screen.getByText('数据超过 1h 新鲜度阈值, 可能过时')).toBeTruthy()
+
+    cleanup()
+  })
+
+  it('renders all-source failure as a retryable error banner', () => {
+    render(createElement(FeedMetaBanners, {
+      meta: normalizeFeedMeta({
+        status: 'stale',
+        stale: true,
+        partial_failures: ['jc:bookmarks', 'jc:likes'],
+        empty_reason: 'source_failure',
+        source_failure_reason: 'jc:bookmarks, jc:likes',
+      }),
+    }))
+
+    expect(screen.getByText('信源全部失败: jc:bookmarks, jc:likes · owner 可前往信源健康重试')).toBeTruthy()
+    expect(screen.queryByText('部分信源数据延迟: jc:bookmarks, jc:likes')).toBeNull()
+
+    cleanup()
+  })
+
+  it('uses neutral empty copy for legal no_data and retry guidance for source failures', () => {
+    expect(getEmptyStateCopy(normalizeFeedMeta({ stale: false, partial_failures: [], empty_reason: 'no_data' })).title).toBe('暂无新动态')
+    expect(getEmptyStateCopy(normalizeFeedMeta({ stale: true, partial_failures: ['x'], empty_reason: 'source_failure' })).description).toContain('owner 可前往信源健康点击重试')
+  })
+
+  it('renders red status chip for full source errors', () => {
+    render(createElement(HotboardStatusChip, {
+      loading: false,
+      hasError: true,
+      tone: 'error',
+      visibleCount: 0,
+      totalCount: 0,
+    }))
+
+    expect(screen.getByTestId('hotboard-status-chip').className).toContain('border-rose-300')
 
     cleanup()
   })

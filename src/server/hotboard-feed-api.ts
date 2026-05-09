@@ -10,6 +10,7 @@ import { X_SIGNAL_PAYLOAD_SCHEMA, type XSignalPayload, type XTweet } from '../ty
 
 type XEventSource = 'x-bookmarks' | 'x-likes' | 'x-following' | 'x-for_you'
 type XSignalSource = XEventSource | 'all' | 'low-follower'
+type XSignalCountKey = keyof XSignalPayload['counts']
 
 type EmptyReason = 'no_data' | 'source_failure' | 'permission_denied'
 
@@ -76,7 +77,7 @@ type HotboardFeedEvent = {
 }
 
 const SOURCE_SCHEMA = z.enum(['x-bookmarks', 'x-likes', 'x-following', 'x-for_you', 'all', 'low-follower'])
-const SOURCE_MAP: Record<XEventSource, keyof XSignalPayload> = {
+const SOURCE_MAP: Record<XEventSource, XSignalCountKey> = {
   'x-bookmarks': 'bookmarks',
   'x-likes': 'likes',
   'x-following': 'following',
@@ -312,13 +313,27 @@ function buildFeedResultFromPayload({
       : source === 'low-follower'
         ? lowFollowerFilter(SOURCE_KEYS.flatMap((key) => build(key)))
       : build(source)
+  const partialFailures = meta.partial_failures
+  const isAllSourceFailure = events.length === 0 && partialFailures.length > 0
+  const resolvedEmptyReason = events.length === 0 ? (isAllSourceFailure ? 'source_failure' : emptyReason) : undefined
+  const resolvedMeta: FeedMeta = isAllSourceFailure
+    ? {
+        ...meta,
+        status: 'stale',
+        stale: true,
+        empty_reason: 'source_failure',
+        source_failure_reason: partialFailures.join(', '),
+      }
+    : events.length === 0 && emptyReason
+      ? { ...meta, empty_reason: emptyReason }
+      : meta
 
   return {
     generated_at: parsed.generated_at,
     data_source: path.basename(xSignalPath),
     fallback: false,
-    meta,
-    empty_reason: events.length === 0 ? emptyReason : undefined,
+    meta: resolvedMeta,
+    empty_reason: resolvedEmptyReason,
     events: events.slice(0, limit),
   }
 }

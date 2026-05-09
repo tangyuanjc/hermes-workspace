@@ -433,17 +433,51 @@ describe('hotboard feed api handlers', () => {
     const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
     const payload = (await response.json()) as {
       fallback: boolean
+      empty_reason?: string
       meta: { stale: boolean; partial_failures: string[] }
       events: Array<{ event_id: string }>
     }
 
     expect(payload.fallback).toBe(false)
     expect(payload.events).toHaveLength(1)
+    expect(payload.empty_reason).toBeUndefined()
     expect(payload.meta).toMatchObject({
       status: 'fresh',
       stale: false,
       partial_failures: ['jc:bookmarks'],
     })
+  })
+
+  it('marks all-failed empty x payloads as source_failure instead of no_data', async () => {
+    createTempFeedFile({
+      ok: false,
+      errors: {
+        'jc:bookmarks': 'rate limited',
+        'jc:likes': 'rate limited',
+      },
+      counts: xSignalCounts(),
+      generated_at: new Date().toISOString(),
+      bookmarks: [],
+      likes: [],
+      following: [],
+      for_you: [],
+    }, { withDefaults: false })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const payload = (await response.json()) as {
+      count: number
+      empty_reason?: string
+      meta: { status?: string; stale: boolean; partial_failures: string[]; source_failure_reason?: string | null }
+      events: Array<Record<string, unknown>>
+    }
+
+    expect(payload.count).toBe(0)
+    expect(payload.events).toEqual([])
+    expect(payload.empty_reason).toBe('source_failure')
+    expect(payload.meta.status).toBe('stale')
+    expect(payload.meta.stale).toBe(true)
+    expect(payload.meta.partial_failures).toEqual(['jc:bookmarks', 'jc:likes'])
+    expect(payload.meta.source_failure_reason).toBe('jc:bookmarks, jc:likes')
   })
 
   it('marks x feed meta stale when generated_at is older than 24 hours', async () => {

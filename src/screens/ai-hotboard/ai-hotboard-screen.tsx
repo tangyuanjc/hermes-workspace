@@ -566,11 +566,11 @@ function formatRelativeAge(value?: string | null) {
   return `${Math.round(diffMs / day)} 天前`
 }
 
-function getEmptyStateCopy(meta: FeedMeta) {
+export function getEmptyStateCopy(meta: FeedMeta) {
   if (meta.empty_reason === 'source_failure') {
     return {
-      title: '信源故障 · 暂无可用数据',
-      description: '当前信源读取失败且没有可展示的 last-good 数据。请稍后刷新，或检查信源健康。',
+      title: '信源全部失败 · 暂无可用数据',
+      description: '当前信源读取失败且没有可展示的 last-good 数据。owner 可前往信源健康点击重试。',
     }
   }
 
@@ -582,7 +582,7 @@ function getEmptyStateCopy(meta: FeedMeta) {
   }
 
   return {
-    title: '暂无信号 · 本期为空',
+    title: '暂无新动态',
     description: '信源成功同步，但当前筛选条件下没有可展示的新信号。',
   }
 }
@@ -1080,18 +1080,23 @@ export function FeedErrorBanners({ authCheckError, feedFetchError }: { authCheck
 
 export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
   const hasPartialFailures = meta.partial_failures.length > 0
-  const isSourceFailure = meta.empty_reason === 'source_failure' || Boolean(meta.source_failure_reason)
+  const isEmptySourceFailure = meta.empty_reason === 'source_failure'
+  const isSourceFailure = isEmptySourceFailure || Boolean(meta.source_failure_reason)
 
-  if (!hasPartialFailures && !meta.stale) return null
+  if (!hasPartialFailures && !meta.stale && !isEmptySourceFailure) return null
 
   return (
     <div className="space-y-3">
-      {hasPartialFailures ? (
+      {isEmptySourceFailure ? (
+        <div className="rounded-lg border border-rose-300/35 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+          信源全部失败: {meta.source_failure_reason || meta.partial_failures.join(', ') || 'unknown'} · owner 可前往信源健康重试
+        </div>
+      ) : hasPartialFailures ? (
         <div className="rounded-lg border border-amber-300/30 bg-amber-400/8 px-4 py-3 text-sm text-amber-200/90">
-          数据源同步异常: {meta.partial_failures.join(', ')}
+          部分信源数据延迟: {meta.partial_failures.join(', ')}
         </div>
       ) : null}
-      {meta.stale ? (
+      {meta.stale && !isEmptySourceFailure ? (
         <div className="rounded-lg border border-slate-300/20 bg-slate-700/30 px-4 py-3 text-sm text-slate-300/80">
           {isSourceFailure
             ? `数据上次成功更新 ${formatRelativeAge(meta.last_success_at)} (信源故障)`
@@ -1123,22 +1128,27 @@ export function getHotboardStatusChipLabel({
 export function HotboardStatusChip({
   loading,
   hasError,
+  tone,
   visibleCount,
   totalCount,
 }: {
   loading: boolean
   hasError: boolean
+  tone?: 'ok' | 'warning' | 'error'
   visibleCount: number
   totalCount: number
 }) {
+  const resolvedTone = tone ?? (hasError ? 'warning' : 'ok')
   return (
     <div
       data-testid="hotboard-status-chip"
       className={cn(
         'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-[0.12em]',
-        hasError
-          ? 'border-amber-300/45 bg-amber-300/10 text-amber-100'
-          : 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
+        resolvedTone === 'error'
+          ? 'border-rose-300/50 bg-rose-400/10 text-rose-100'
+          : resolvedTone === 'warning'
+            ? 'border-amber-300/45 bg-amber-300/10 text-amber-100'
+            : 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
       )}
       style={EDITORIAL_MONO_STYLE}
     >
@@ -2088,7 +2098,7 @@ export function AiHotboardScreen({
 
         if (cancelled) return
 
-        setFeedMeta(normalizeFeedMeta({ ...body.meta, empty_reason: body.empty_reason ?? body.meta?.empty_reason }))
+        setFeedMeta(normalizeFeedMeta({ ...body.meta, empty_reason: body.empty_reason }))
         setRemotePayload({
           generated_at: String(body.generated_at ?? new Date().toISOString()),
           note: `source=${normalizedSource}`,
@@ -2657,6 +2667,7 @@ export function AiHotboardScreen({
       (effectivePage === 'source-wechat' && wechatError) ||
       (effectivePage === 'source-zara-youtube' && zaraError),
   )
+  const compactStatusTone = feedMeta.empty_reason === 'source_failure' || feedFetchError ? 'error' : compactStatusHasError ? 'warning' : 'ok'
 
   const renderMainPanel = () => {
     if (isPlaceholderSourcePage(effectivePage)) {
@@ -2993,6 +3004,7 @@ export function AiHotboardScreen({
                     <HotboardStatusChip
                       loading={compactStatusLoading}
                       hasError={compactStatusHasError}
+                      tone={compactStatusTone}
                       visibleCount={filteredTimelineEvents.length}
                       totalCount={timelineEvents.length}
                     />
