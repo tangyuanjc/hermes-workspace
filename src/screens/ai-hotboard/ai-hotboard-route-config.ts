@@ -23,6 +23,33 @@ export type AiHotboardPage =
   | 'user'
   | 'logout'
 
+export type HotboardRouteChrome = 'expanded' | 'compact'
+
+export const HOTBOARD_ROUTE_CHROME = {
+  featured: 'compact',
+  'view-all': 'expanded',
+  'view-low-follower': 'expanded',
+  'view-bookmarks': 'compact',
+  'source-x-bookmarks': 'compact',
+  'source-x-likes': 'compact',
+  'source-x-following': 'compact',
+  'source-x-for_you': 'compact',
+  'source-wechat': 'compact',
+  'source-jc-human-talks': 'compact',
+  'source-zara-youtube': 'compact',
+  'intake-hermes': 'compact',
+  'intake-xiaoj': 'compact',
+  'strategy-line': 'compact',
+  iteration: 'compact',
+  system: 'compact',
+  user: 'compact',
+  logout: 'compact',
+} satisfies Record<AiHotboardPage, HotboardRouteChrome>
+
+export function getHotboardRouteChrome(page: AiHotboardPage): HotboardRouteChrome {
+  return HOTBOARD_ROUTE_CHROME[page]
+}
+
 export function normalizeHotboardPage(page?: AiHotboardPage): AiHotboardPage {
   return page ?? 'featured'
 }

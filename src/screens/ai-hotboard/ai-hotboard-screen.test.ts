@@ -495,6 +495,20 @@ describe('mock feed loading', () => {
     expect(source).not.toContain("await import('./ai_hotboard_mock_events.json')")
     expect(source).toContain('await import(/* @vite-ignore */ `./${DATA_SOURCE_LABEL}`)')
   })
+
+  it('keeps source action panels before the global empty-state return', () => {
+    const sourcePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ai-hotboard-screen.tsx')
+    const source = fs.readFileSync(sourcePath, 'utf-8')
+    const renderMainPanel = source.slice(
+      source.indexOf('const renderMainPanel = () => {'),
+      source.indexOf('  if (!authResolved)'),
+    )
+
+    const emptyReturnIndex = renderMainPanel.indexOf('if (isFeedPage(effectivePage) && timelineGroups.length === 0)')
+
+    expect(renderMainPanel.indexOf("if (effectivePage === 'source-wechat')")).toBeLessThan(emptyReturnIndex)
+    expect(renderMainPanel.indexOf("if (effectivePage === 'source-zara-youtube')")).toBeLessThan(emptyReturnIndex)
+  })
 })
 
 describe('buildFeedStats', () => {

@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import {
   getVisibleSystemNavItems,
+  getHotboardStatusChipLabel,
+  HotboardStatusChip,
   IntakePanel,
   resolveVisibleSourceLabel,
   shouldShowExpandedFeedChrome,
@@ -51,6 +53,22 @@ describe('ai-hotboard member owner-card explainers', () => {
     expect(shouldShowExpandedFeedChrome('view-bookmarks')).toBe(false)
     expect(shouldShowExpandedFeedChrome('source-x-bookmarks')).toBe(false)
     expect(shouldShowExpandedFeedChrome('system')).toBe(false)
+  })
+
+  it('keeps compact status chip available without rendering expanded KPI chrome', () => {
+    expect(getHotboardStatusChipLabel({ loading: false, hasError: false, visibleCount: 0, totalCount: 27 })).toBe('0/27 显示')
+    expect(getHotboardStatusChipLabel({ loading: true, hasError: false, visibleCount: 0, totalCount: 27 })).toBe('同步中...')
+    expect(getHotboardStatusChipLabel({ loading: false, hasError: true, visibleCount: 0, totalCount: 27 })).toBe('⚠ 0/27 显示')
+
+    render(createElement(HotboardStatusChip, {
+      loading: false,
+      hasError: true,
+      visibleCount: 0,
+      totalCount: 27,
+    }))
+
+    expect(screen.getByTestId('hotboard-status-chip')).toBeTruthy()
+    expect(screen.getByText('⚠ 0/27 显示')).toBeTruthy()
   })
 
   it('renders intake as read-only for members without a create affordance', () => {

@@ -23,6 +23,7 @@ import {
   type MockEvent,
 } from './ai-hotboard-feed-adapter'
 import {
+  getHotboardRouteChrome,
   normalizeHotboardPage,
   resolveHotboardPageFromSource,
   resolveSourceByHotboardPage,
@@ -633,7 +634,7 @@ function isFeedPage(page: AiHotboardPage) {
 }
 
 export function shouldShowExpandedFeedChrome(page: AiHotboardPage) {
-  return page === 'view-all' || page === 'view-low-follower'
+  return getHotboardRouteChrome(page) === 'expanded'
 }
 
 function isPlaceholderSourcePage(page: AiHotboardPage): page is Extract<SourcePageKey, 'source-jc-human-talks'> {
@@ -1093,6 +1094,50 @@ export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
             : '数据距上次同步 24h+, 可能过时'}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+export function getHotboardStatusChipLabel({
+  loading,
+  hasError,
+  visibleCount,
+  totalCount,
+}: {
+  loading: boolean
+  hasError: boolean
+  visibleCount: number
+  totalCount: number
+}) {
+  if (loading) return '同步中...'
+  const countLabel = `${visibleCount}/${totalCount} 显示`
+  return hasError ? `⚠ ${countLabel}` : countLabel
+}
+
+export function HotboardStatusChip({
+  loading,
+  hasError,
+  visibleCount,
+  totalCount,
+}: {
+  loading: boolean
+  hasError: boolean
+  visibleCount: number
+  totalCount: number
+}) {
+  return (
+    <div
+      data-testid="hotboard-status-chip"
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-[0.12em]',
+        hasError
+          ? 'border-amber-300/45 bg-amber-300/10 text-amber-100'
+          : 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
+      )}
+      style={EDITORIAL_MONO_STYLE}
+    >
+      {loading ? <span className="inline-block animate-spin">○</span> : null}
+      {getHotboardStatusChipLabel({ loading, hasError, visibleCount, totalCount })}
     </div>
   )
 }
@@ -1831,6 +1876,7 @@ export function AiHotboardScreen({
   const [remoteSourceLabel, setRemoteSourceLabel] = useState(DATA_SOURCE_LABEL)
   const [remoteGeneratedAt, setRemoteGeneratedAt] = useState(EMPTY_MOCK_PAYLOAD.generated_at)
   const [feedMeta, setFeedMeta] = useState<FeedMeta>(EMPTY_FEED_META)
+  const [feedLoading, setFeedLoading] = useState(false)
   const [feedFetchError, setFeedFetchError] = useState<string | null>(null)
   const [voteAggregateByEvent, setVoteAggregateByEvent] = useState<VoteAggregateByEvent>({})
   const [seenUserId, setSeenUserId] = useState('unknown-user')
@@ -1886,12 +1932,16 @@ export function AiHotboardScreen({
     let cancelled = false
 
     async function loadFeed() {
-      if (!isFeedPage(effectivePage)) return
-      if (isPlaceholderSourcePage(effectivePage)) return
-      if (!authResolved || authRequired || authCheckError) return
+      if (!isFeedPage(effectivePage) || isPlaceholderSourcePage(effectivePage) || !authResolved || authRequired || authCheckError) {
+        if (!cancelled) {
+          setFeedLoading(false)
+        }
+        return
+      }
 
       if (effectivePage === 'source-wechat') {
         if (!cancelled) {
+          setFeedLoading(false)
           setWechatLoading(true)
           setWechatError(null)
         }
@@ -1949,6 +1999,7 @@ export function AiHotboardScreen({
 
       if (effectivePage === 'source-zara-youtube') {
         if (!cancelled) {
+          setFeedLoading(false)
           setZaraLoading(true)
           setZaraError(null)
         }
@@ -2004,6 +2055,7 @@ export function AiHotboardScreen({
       }
 
       try {
+        setFeedLoading(true)
         setFeedFetchError(null)
         const response = await fetch(
           `/api/hotboard/feed?source=${encodeURIComponent(normalizedSource)}`,
@@ -2045,6 +2097,10 @@ export function AiHotboardScreen({
           setFeedFetchError(error instanceof Error ? error.message : 'feed request failed')
         }
         // Keep fallback payload when feed API fails.
+      } finally {
+        if (!cancelled) {
+          setFeedLoading(false)
+        }
       }
 
       if (!cancelled) {
@@ -2584,28 +2640,23 @@ export function AiHotboardScreen({
   const visibleSystemNavItems = getVisibleSystemNavItems(authUser)
   const visibleRemoteSourceLabel = resolveVisibleSourceLabel(remoteSourceLabel, authUser)
   const showExpandedFeedChrome = shouldShowExpandedFeedChrome(effectivePage)
+  const compactStatusLoading =
+    feedLoading ||
+    (effectivePage === 'source-wechat' && wechatLoading) ||
+    (effectivePage === 'source-zara-youtube' && (zaraLoading || zaraRefreshing))
+  const compactStatusHasError = Boolean(
+    feedFetchError ||
+      feedMeta.stale ||
+      feedMeta.partial_failures.length > 0 ||
+      (effectivePage === 'source-wechat' && wechatError) ||
+      (effectivePage === 'source-zara-youtube' && zaraError),
+  )
 
   const renderMainPanel = () => {
     if (isPlaceholderSourcePage(effectivePage)) {
       return <JcHumanTalksComingSoonCard />
     }
 
-    if (isFeedPage(effectivePage) && timelineGroups.length === 0) {
-      const emptyStateCopy = getEmptyStateCopy(feedMeta)
-      return (
-        <>
-          <FeedErrorBanners authCheckError={authCheckError} feedFetchError={feedFetchError} />
-          <FeedMetaBanners meta={feedMeta} />
-          <FriendlyEmptyState
-            icon={AiSearchIcon}
-            title={emptyStateCopy.title}
-            description={emptyStateCopy.description}
-            ctaLabel="查看信源健康"
-            ctaTo="/ai-hotboard/sources/health"
-          />
-        </>
-      )
-    }
 
     if (effectivePage === 'intake-hermes' || effectivePage === 'intake-xiaoj') {
       const panelTitle = effectivePage === 'intake-hermes' ? '爱马仕战略发现' : '小J 执行发现'
@@ -2728,6 +2779,23 @@ export function AiHotboardScreen({
           ) : null}
 
           <ZaraYoutubeTimeline items={zaraItems} />
+        </>
+      )
+    }
+
+    if (isFeedPage(effectivePage) && timelineGroups.length === 0) {
+      const emptyStateCopy = getEmptyStateCopy(feedMeta)
+      return (
+        <>
+          <FeedErrorBanners authCheckError={authCheckError} feedFetchError={feedFetchError} />
+          <FeedMetaBanners meta={feedMeta} />
+          <FriendlyEmptyState
+            icon={AiSearchIcon}
+            title={emptyStateCopy.title}
+            description={emptyStateCopy.description}
+            ctaLabel="查看信源健康"
+            ctaTo="/ai-hotboard/sources/health"
+          />
         </>
       )
     }
@@ -2910,9 +2978,19 @@ export function AiHotboardScreen({
                   </div>
                 </>
               ) : (
-                <div className="min-w-0 text-xs leading-5 text-slate-300">
-                  <div className="truncate tracking-[0.18em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>AI HOTBOARD / {feedHeading.title}</div>
-                  <div className="mt-1 truncate text-slate-400">更新 {formatGeneratedAt(remoteGeneratedAt)} · 来源 {visibleRemoteSourceLabel}</div>
+                <div className="min-w-0 space-y-2 text-xs leading-5 text-slate-300">
+                  <div>
+                    <div className="truncate tracking-[0.18em] text-cyan-300/80" style={EDITORIAL_MONO_STYLE}>AI HOTBOARD / {feedHeading.title}</div>
+                    <div className="mt-1 truncate text-slate-400">更新 {formatGeneratedAt(remoteGeneratedAt)} · 来源 {visibleRemoteSourceLabel}</div>
+                  </div>
+                  {isFeedPage(effectivePage) ? (
+                    <HotboardStatusChip
+                      loading={compactStatusLoading}
+                      hasError={compactStatusHasError}
+                      visibleCount={filteredTimelineEvents.length}
+                      totalCount={timelineEvents.length}
+                    />
+                  ) : null}
                 </div>
               )}
               <div className="mt-1 flex items-center justify-between gap-2 rounded-[16px] border border-white/10 bg-slate-900/55 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
