@@ -7,6 +7,7 @@ import { handleHotboardFeedGet, lowFollowerFilter } from './hotboard-feed-api'
 
 const tempDirs: string[] = []
 const originalXFeedPath = process.env.HOTBOARD_X_SIGNAL_PATH
+const originalLastGoodPath = process.env.HOTBOARD_FEED_LASTGOOD_PATH
 const originalAuthDbPath = process.env.HERMES_AUTH_DB_PATH
 const originalMockFallback = process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK
 
@@ -15,6 +16,12 @@ afterEach(() => {
     delete process.env.HOTBOARD_X_SIGNAL_PATH
   } else {
     process.env.HOTBOARD_X_SIGNAL_PATH = originalXFeedPath
+  }
+
+  if (originalLastGoodPath === undefined) {
+    delete process.env.HOTBOARD_FEED_LASTGOOD_PATH
+  } else {
+    process.env.HOTBOARD_FEED_LASTGOOD_PATH = originalLastGoodPath
   }
 
   if (originalAuthDbPath === undefined) {
@@ -55,13 +62,31 @@ function setupTempAuth() {
     ttlSeconds: 7 * 24 * 60 * 60,
   })
 
+  process.env.HOTBOARD_FEED_LASTGOOD_PATH = path.join(tempDir, 'hotboard-feed-lastgood.json')
+
   return tempDir
 }
 
-function createTempFeedFile(payload: unknown) {
+function withValidFeedDefaults(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload
+  const record = payload as Record<string, unknown>
+  return {
+    generated_at: '2026-05-06T10:00:00.000Z',
+    counts: {
+      bookmarks: Array.isArray(record.bookmarks) ? record.bookmarks.length : 0,
+      likes: Array.isArray(record.likes) ? record.likes.length : 0,
+      following: Array.isArray(record.following) ? record.following.length : 0,
+      for_you: Array.isArray(record.for_you) ? record.for_you.length : 0,
+    },
+    ...record,
+  }
+}
+
+function createTempFeedFile(payload: unknown, options: { withDefaults?: boolean } = {}) {
   const tempDir = setupTempAuth()
   const feedPath = path.join(tempDir, 'x_signal_sync_latest.json')
-  fs.writeFileSync(feedPath, JSON.stringify(payload, null, 2), 'utf-8')
+  const nextPayload = options.withDefaults === false ? payload : withValidFeedDefaults(payload)
+  fs.writeFileSync(feedPath, JSON.stringify(nextPayload, null, 2), 'utf-8')
   process.env.HOTBOARD_X_SIGNAL_PATH = feedPath
   return feedPath
 }
@@ -392,7 +417,8 @@ describe('hotboard feed api handlers', () => {
 
     expect(payload.fallback).toBe(false)
     expect(payload.events).toHaveLength(1)
-    expect(payload.meta).toEqual({
+    expect(payload.meta).toMatchObject({
+      status: 'fresh',
       stale: false,
       partial_failures: ['jc:bookmarks'],
     })
@@ -420,6 +446,105 @@ describe('hotboard feed api handlers', () => {
 
     expect(payload.meta.stale).toBe(true)
     expect(payload.meta.partial_failures).toEqual([])
+  })
+
+  it('marks schema-invalid x payload stale instead of treating it as fresh', async () => {
+    createTempFeedFile({
+      counts: { bookmarks: 1 },
+      bookmarks: [
+        {
+          id: 'tweet-missing-generated-at',
+          text: 'schema drift tweet',
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    }, { withDefaults: false })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const payload = (await response.json()) as {
+      count: number
+      empty_reason?: string
+      meta: { status?: string; stale: boolean; partial_failures: string[] }
+      events: Array<Record<string, unknown>>
+    }
+
+    expect(payload.count).toBe(0)
+    expect(payload.events).toEqual([])
+    expect(payload.empty_reason).toBe('source_failure')
+    expect(payload.meta.status).toBe('stale')
+    expect(payload.meta.stale).toBe(true)
+    expect(payload.meta.partial_failures).toContain('invalid_x_signal_schema')
+  })
+
+  it('returns stale last-good events when latest x signal file is missing', async () => {
+    const feedPath = createTempFeedFile({
+      ok: true,
+      errors: {},
+      counts: { bookmarks: 1 },
+      generated_at: '2026-05-06T10:00:00.000Z',
+      bookmarks: [
+        {
+          id: 'tweet-last-good',
+          text: 'last good tweet',
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    })
+
+    const freshResponse = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const freshPayload = (await freshResponse.json()) as { count: number; events: Array<Record<string, unknown>> }
+    expect(freshPayload.count).toBe(1)
+    expect(freshPayload.events[0]?.event_id).toBe('x-bookmarks-self-tweet-last-good')
+
+    fs.rmSync(feedPath)
+    const staleResponse = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const stalePayload = (await staleResponse.json()) as {
+      count: number
+      empty_reason?: string
+      meta: { status?: string; stale: boolean; partial_failures: string[]; last_success_at?: string }
+      events: Array<Record<string, unknown>>
+    }
+
+    expect(stalePayload.count).toBe(1)
+    expect(stalePayload.empty_reason).toBeUndefined()
+    expect(stalePayload.meta.status).toBe('stale')
+    expect(stalePayload.meta.stale).toBe(true)
+    expect(stalePayload.meta.partial_failures).toContain('missing_x_signal_latest')
+    expect(stalePayload.meta.last_success_at).toBe('2026-05-06T10:00:00.000Z')
+    expect(stalePayload.events[0]?.event_id).toBe('x-bookmarks-self-tweet-last-good')
+  })
+
+  it('returns explicit no_data empty reason for valid empty x payloads', async () => {
+    createTempFeedFile({
+      ok: true,
+      errors: {},
+      counts: { bookmarks: 0 },
+      generated_at: new Date().toISOString(),
+      bookmarks: [],
+      likes: [],
+      following: [],
+      for_you: [],
+    })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const payload = (await response.json()) as {
+      count: number
+      empty_reason?: string
+      meta: { status?: string; stale: boolean; partial_failures: string[] }
+      events: Array<Record<string, unknown>>
+    }
+
+    expect(payload.count).toBe(0)
+    expect(payload.events).toEqual([])
+    expect(payload.empty_reason).toBe('no_data')
+    expect(payload.meta.status).toBe('fresh')
+    expect(payload.meta.stale).toBe(false)
   })
 
   it('does not fall back to mock data for x-bookmarks when the x signal file is missing', async () => {
@@ -464,7 +589,7 @@ describe('hotboard feed api handlers', () => {
     expect(payload.ok).toBe(true)
     expect(payload.fallback).toBe(true)
     expect(payload.data_source).toBe('ai_hotboard_mock_events.json')
-    expect(payload.meta).toEqual({ stale: false, partial_failures: [] })
+    expect(payload.meta).toEqual({ status: 'fresh', stale: false, partial_failures: [] })
     expect(payload.count).toBeGreaterThan(0)
     expect(payload.events[0]).toHaveProperty('event_id')
     expect(payload.events[0]).toHaveProperty('signal_score')

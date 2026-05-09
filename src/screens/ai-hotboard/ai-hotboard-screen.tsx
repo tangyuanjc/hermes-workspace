@@ -43,8 +43,12 @@ const EMPTY_MOCK_PAYLOAD: MockPayload = {
 }
 
 type FeedMeta = {
+  status?: 'fresh' | 'stale'
   stale: boolean
   partial_failures: string[]
+  empty_reason?: 'no_data' | 'source_failure' | 'permission_denied'
+  last_success_at?: string | null
+  source_failure_reason?: string | null
 }
 
 type SeenEventStorage = Pick<Storage, 'getItem' | 'setItem'>
@@ -65,7 +69,7 @@ type TimelineGroup = {
 
 const DATA_SOURCE_LABEL = ['ai_hotboard', 'mock_events.json'].join('_')
 const STRATEGY_GLOSSARY_SOURCE_LABEL = '~/.org/shared-memory/business-glossary.md'
-const EMPTY_FEED_META: FeedMeta = { stale: false, partial_failures: [] }
+const EMPTY_FEED_META: FeedMeta = { status: 'fresh', stale: false, partial_failures: [] }
 export const SEEN_EVENT_STORAGE_LIMIT = 1000
 export const SEEN_EVENT_DWELL_MS = 2500
 
@@ -209,11 +213,22 @@ export function observeSeenEventDwell({
 }
 
 export function normalizeFeedMeta(meta?: Partial<FeedMeta>): FeedMeta {
+  const emptyReason =
+    meta?.empty_reason === 'no_data' ||
+    meta?.empty_reason === 'source_failure' ||
+    meta?.empty_reason === 'permission_denied'
+      ? meta.empty_reason
+      : undefined
+
   return {
+    status: meta?.status === 'stale' ? 'stale' : 'fresh',
     stale: meta?.stale === true,
     partial_failures: Array.isArray(meta?.partial_failures)
       ? meta.partial_failures.map((item) => String(item))
       : [],
+    empty_reason: emptyReason,
+    last_success_at: typeof meta?.last_success_at === 'string' ? meta.last_success_at : null,
+    source_failure_reason: typeof meta?.source_failure_reason === 'string' ? meta.source_failure_reason : null,
   }
 }
 
@@ -532,6 +547,39 @@ function formatGeneratedAt(value: string) {
     minute: '2-digit',
     hour12: false,
   }).format(date)
+}
+
+function formatRelativeAge(value?: string | null) {
+  if (!value) return '未知时间'
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return value
+  const diffMs = Math.max(0, Date.now() - timestamp)
+  const hour = 60 * 60 * 1000
+  const day = 24 * hour
+  if (diffMs < hour) return `${Math.max(1, Math.round(diffMs / (60 * 1000)))} 分钟前`
+  if (diffMs < day) return `${Math.round(diffMs / hour)} 小时前`
+  return `${Math.round(diffMs / day)} 天前`
+}
+
+function getEmptyStateCopy(meta: FeedMeta) {
+  if (meta.empty_reason === 'source_failure') {
+    return {
+      title: '信源故障 · 暂无可用数据',
+      description: '当前信源读取失败且没有可展示的 last-good 数据。请稍后刷新，或检查信源健康。',
+    }
+  }
+
+  if (meta.empty_reason === 'permission_denied') {
+    return {
+      title: '暂无权限查看信号',
+      description: '当前账号无权读取该信源。请联系 JC 申请 owner 权限或切换账号。',
+    }
+  }
+
+  return {
+    title: '暂无信号 · 本期为空',
+    description: '信源成功同步，但当前筛选条件下没有可展示的新信号。',
+  }
 }
 
 function formatEntryTime(value: string) {
@@ -1027,6 +1075,7 @@ export function FeedErrorBanners({ authCheckError, feedFetchError }: { authCheck
 
 export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
   const hasPartialFailures = meta.partial_failures.length > 0
+  const isSourceFailure = meta.empty_reason === 'source_failure' || Boolean(meta.source_failure_reason)
 
   if (!hasPartialFailures && !meta.stale) return null
 
@@ -1039,7 +1088,9 @@ export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
       ) : null}
       {meta.stale ? (
         <div className="rounded-lg border border-slate-300/20 bg-slate-700/30 px-4 py-3 text-sm text-slate-300/80">
-          数据距上次同步 24h+, 可能过时
+          {isSourceFailure
+            ? `数据上次成功更新 ${formatRelativeAge(meta.last_success_at)} (信源故障)`
+            : '数据距上次同步 24h+, 可能过时'}
         </div>
       ) : null}
     </div>
@@ -1968,6 +2019,7 @@ export function AiHotboardScreen({
           generated_at?: string
           data_source?: string
           meta?: Partial<FeedMeta>
+          empty_reason?: FeedMeta['empty_reason']
           events?: Array<Record<string, unknown>>
         }
 
@@ -1978,18 +2030,15 @@ export function AiHotboardScreen({
 
         if (cancelled) return
 
-        setFeedMeta(normalizeFeedMeta(body.meta))
-
-        if (normalizedEvents.length > 0) {
-          setRemotePayload({
-            generated_at: String(body.generated_at ?? new Date().toISOString()),
-            note: `source=${normalizedSource}`,
-            events: normalizedEvents,
-          })
-          setRemoteSourceLabel(String(body.data_source ?? DATA_SOURCE_LABEL))
-          setRemoteGeneratedAt(String(body.generated_at ?? new Date().toISOString()))
-          return
-        }
+        setFeedMeta(normalizeFeedMeta({ ...body.meta, empty_reason: body.empty_reason ?? body.meta?.empty_reason }))
+        setRemotePayload({
+          generated_at: String(body.generated_at ?? new Date().toISOString()),
+          note: `source=${normalizedSource}`,
+          events: normalizedEvents,
+        })
+        setRemoteSourceLabel(String(body.data_source ?? DATA_SOURCE_LABEL))
+        setRemoteGeneratedAt(String(body.generated_at ?? new Date().toISOString()))
+        return
       } catch (error) {
         console.error('[ai-hotboard] feed-fetch failed', error)
         if (!cancelled) {
@@ -2542,14 +2591,19 @@ export function AiHotboardScreen({
     }
 
     if (isFeedPage(effectivePage) && timelineGroups.length === 0) {
+      const emptyStateCopy = getEmptyStateCopy(feedMeta)
       return (
-        <FriendlyEmptyState
-          icon={AiSearchIcon}
-          title="暂无信号 · 信源加载中或本期为空"
-          description="当前没有可展示的真实信号。请稍后刷新，或检查 X / 公众号 / Zara 等信源同步状态。"
-          ctaLabel="查看信源健康"
-          ctaTo="/ai-hotboard/sources/health"
-        />
+        <>
+          <FeedErrorBanners authCheckError={authCheckError} feedFetchError={feedFetchError} />
+          <FeedMetaBanners meta={feedMeta} />
+          <FriendlyEmptyState
+            icon={AiSearchIcon}
+            title={emptyStateCopy.title}
+            description={emptyStateCopy.description}
+            ctaLabel="查看信源健康"
+            ctaTo="/ai-hotboard/sources/health"
+          />
+        </>
       )
     }
 

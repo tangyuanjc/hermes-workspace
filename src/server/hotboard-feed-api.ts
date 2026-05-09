@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import { isAuthenticated } from './auth-middleware'
+import { resolveXSignalLatestPath } from './source-registry'
 
 type XEventSource = 'x-bookmarks' | 'x-likes' | 'x-following' | 'x-for_you'
 type XSignalSource = XEventSource | 'all' | 'low-follower'
@@ -26,17 +27,23 @@ type XTweet = {
 type XSignalPayload = {
   ok?: boolean
   errors?: Record<string, unknown>
-  counts?: Record<string, number>
+  counts: Record<string, unknown>
   bookmarks?: XTweet[]
   likes?: XTweet[]
   following?: XTweet[]
   for_you?: XTweet[]
-  generated_at?: string
+  generated_at: string
 }
 
+type EmptyReason = 'no_data' | 'source_failure' | 'permission_denied'
+
 type FeedMeta = {
+  status: 'fresh' | 'stale'
   stale: boolean
   partial_failures: string[]
+  empty_reason?: EmptyReason
+  last_success_at?: string | null
+  source_failure_reason?: string | null
 }
 
 type FeedResult = {
@@ -44,6 +51,7 @@ type FeedResult = {
   data_source: string
   fallback: boolean
   meta: FeedMeta
+  empty_reason?: EmptyReason
   events: HotboardFeedEvent[]
 }
 
@@ -90,7 +98,6 @@ type HotboardFeedEvent = {
   timestamp_ms: number
 }
 
-const DEFAULT_X_SIGNAL_PATH = path.join(os.homedir(), '.hermes', 'tmp', 'x_signal_sync_latest.json')
 const SOURCE_SCHEMA = z.enum(['x-bookmarks', 'x-likes', 'x-following', 'x-for_you', 'all', 'low-follower'])
 const SOURCE_MAP: Record<XEventSource, keyof XSignalPayload> = {
   'x-bookmarks': 'bookmarks',
@@ -102,9 +109,26 @@ const SOURCE_KEYS = Object.keys(SOURCE_MAP) as XEventSource[]
 const DEFAULT_LIMIT = 30
 const X_SIGNAL_STALE_MS = 24 * 60 * 60 * 1000
 const MOCK_FEED_FILE_NAME = ['ai_hotboard', 'mock_events.json'].join('_')
+const X_TWEET_SCHEMA = z.record(z.unknown())
+const X_SIGNAL_PAYLOAD_SCHEMA = z.object({
+  generated_at: z.string().trim().min(1),
+  counts: z.record(z.unknown()),
+  ok: z.boolean().optional(),
+  errors: z.record(z.unknown()).optional(),
+  bookmarks: z.array(X_TWEET_SCHEMA).optional(),
+  likes: z.array(X_TWEET_SCHEMA).optional(),
+  following: z.array(X_TWEET_SCHEMA).optional(),
+  for_you: z.array(X_TWEET_SCHEMA).optional(),
+}).passthrough()
 
 function resolveXSignalPath() {
-  return process.env.HOTBOARD_X_SIGNAL_PATH || DEFAULT_X_SIGNAL_PATH
+  return resolveXSignalLatestPath()
+}
+
+function resolveLastGoodPath() {
+  const explicit = process.env.HOTBOARD_FEED_LASTGOOD_PATH?.trim()
+  if (explicit) return explicit
+  return path.join(os.homedir(), '.hermes', 'data', 'hotboard-feed-lastgood.json')
 }
 
 function truncateSummary(input: string) {
@@ -210,17 +234,50 @@ function toHotboardEvent(
   }
 }
 
-function parseXSignalPayload(raw: string): XSignalPayload | null {
+type ParseXSignalPayloadResult =
+  | { ok: true; payload: XSignalPayload }
+  | { ok: false; reason: 'invalid_x_signal_latest' | 'invalid_x_signal_schema' }
+
+function isValidCountValue(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value) && value >= 0
+  if (value && typeof value === 'object') {
+    const total = (value as { total?: unknown }).total
+    return typeof total === 'number' && Number.isFinite(total) && total >= 0
+  }
+  return false
+}
+
+function hasValidCounts(payload: XSignalPayload) {
+  const countValues = Object.values(payload.counts)
+  if (countValues.some((value) => !isValidCountValue(value))) return false
+
+  if (payload.ok === false) return true
+
+  return SOURCE_KEYS.every((key) => {
+    const countValue = payload.counts[SOURCE_MAP[key]]
+    const items = payload[SOURCE_MAP[key]]
+    if (typeof countValue !== 'number' || !Array.isArray(items)) return true
+    return countValue >= items.length
+  })
+}
+
+function parseXSignalPayload(raw: string): ParseXSignalPayloadResult {
   try {
-    const parsed = JSON.parse(raw) as XSignalPayload
-    return parsed && typeof parsed === 'object' ? parsed : null
+    const jsonValue = JSON.parse(raw) as unknown
+    const parsed = X_SIGNAL_PAYLOAD_SCHEMA.safeParse(jsonValue)
+    if (!parsed.success) return { ok: false, reason: 'invalid_x_signal_schema' }
+    if (Number.isNaN(Date.parse(parsed.data.generated_at))) {
+      return { ok: false, reason: 'invalid_x_signal_schema' }
+    }
+    const payload = parsed.data as XSignalPayload
+    if (!hasValidCounts(payload)) return { ok: false, reason: 'invalid_x_signal_schema' }
+    return { ok: true, payload }
   } catch {
-    return null
+    return { ok: false, reason: 'invalid_x_signal_latest' }
   }
 }
 
-function isStaleGeneratedAt(value?: string) {
-  if (!value) return false
+function isStaleGeneratedAt(value: string) {
   const timestamp = Date.parse(value)
   if (Number.isNaN(timestamp)) return true
   return Date.now() - timestamp > X_SIGNAL_STALE_MS
@@ -228,38 +285,60 @@ function isStaleGeneratedAt(value?: string) {
 
 function buildXSignalMeta(parsed: XSignalPayload): FeedMeta {
   const partialFailures = Object.keys(parsed.errors ?? {})
+  const stale = isStaleGeneratedAt(parsed.generated_at)
   return {
-    stale: isStaleGeneratedAt(parsed.generated_at),
+    status: stale ? 'stale' : 'fresh',
+    stale,
     partial_failures: parsed.ok === false && partialFailures.length === 0 ? ['unknown'] : partialFailures,
+    last_success_at: parsed.generated_at,
   }
 }
 
 function emptyMeta(): FeedMeta {
-  return { stale: false, partial_failures: [] }
+  return { status: 'fresh', stale: false, partial_failures: [] }
 }
 
 function shouldEnableMockFallback() {
   return process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK === '1'
 }
 
-function emptyXFeedResult(xSignalPath: string, reason?: string): FeedResult {
+function sourceFailureMeta(reason: string, lastSuccessAt: string | null = null): FeedMeta {
+  return {
+    status: 'stale',
+    stale: true,
+    partial_failures: [reason],
+    empty_reason: 'source_failure',
+    last_success_at: lastSuccessAt,
+    source_failure_reason: reason,
+  }
+}
+
+function emptyXFeedResult(xSignalPath: string, reason?: string, emptyReason: EmptyReason = 'no_data'): FeedResult {
   return {
     generated_at: new Date().toISOString(),
     data_source: path.basename(xSignalPath),
     fallback: false,
-    meta: reason ? { stale: false, partial_failures: [reason] } : emptyMeta(),
+    meta: reason ? sourceFailureMeta(reason) : { ...emptyMeta(), empty_reason: emptyReason },
+    empty_reason: reason ? 'source_failure' : emptyReason,
     events: [],
   }
 }
 
-function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT): FeedResult {
-  const xSignalPath = resolveXSignalPath()
-  if (!fs.existsSync(xSignalPath)) return emptyXFeedResult(xSignalPath, 'missing_x_signal_latest')
-
-  const raw = fs.readFileSync(xSignalPath, 'utf-8')
-  const parsed = parseXSignalPayload(raw)
-  if (!parsed) return emptyXFeedResult(xSignalPath, 'invalid_x_signal_latest')
-
+function buildFeedResultFromPayload({
+  parsed,
+  source,
+  limit,
+  xSignalPath,
+  meta,
+  emptyReason,
+}: {
+  parsed: XSignalPayload
+  source: XSignalSource
+  limit: number
+  xSignalPath: string
+  meta: FeedMeta
+  emptyReason?: EmptyReason
+}): FeedResult {
   const build = (key: XEventSource) => {
     const items = (parsed[SOURCE_MAP[key]] ?? []) as XTweet[]
     return items.map((tweet, index) => toHotboardEvent(tweet, key, index))
@@ -273,12 +352,68 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT): FeedResu
       : build(source)
 
   return {
-    generated_at: parsed.generated_at ?? new Date().toISOString(),
+    generated_at: parsed.generated_at,
     data_source: path.basename(xSignalPath),
     fallback: false,
-    meta: buildXSignalMeta(parsed),
+    meta,
+    empty_reason: events.length === 0 ? emptyReason : undefined,
     events: events.slice(0, limit),
   }
+}
+
+function readLastGoodPayload(): XSignalPayload | null {
+  const lastGoodPath = resolveLastGoodPath()
+  if (!fs.existsSync(lastGoodPath)) return null
+  try {
+    const raw = fs.readFileSync(lastGoodPath, 'utf-8')
+    const parsed = JSON.parse(raw) as { payload?: unknown }
+    if (!parsed.payload) return null
+    const result = parseXSignalPayload(JSON.stringify(parsed.payload))
+    return result.ok ? result.payload : null
+  } catch {
+    return null
+  }
+}
+
+function writeLastGoodPayload(payload: XSignalPayload) {
+  const lastGoodPath = resolveLastGoodPath()
+  fs.mkdirSync(path.dirname(lastGoodPath), { recursive: true })
+  fs.writeFileSync(lastGoodPath, JSON.stringify({ saved_at: new Date().toISOString(), payload }, null, 2), 'utf-8')
+}
+
+function staleLastGoodResult(source: XSignalSource, limit: number, xSignalPath: string, reason: string): FeedResult {
+  const lastGood = readLastGoodPayload()
+  if (!lastGood) return emptyXFeedResult(xSignalPath, reason, 'source_failure')
+
+  return buildFeedResultFromPayload({
+    parsed: lastGood,
+    source,
+    limit,
+    xSignalPath,
+    meta: sourceFailureMeta(reason, lastGood.generated_at),
+    emptyReason: 'source_failure',
+  })
+}
+
+function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT): FeedResult {
+  const xSignalPath = resolveXSignalPath()
+  if (!fs.existsSync(xSignalPath)) return staleLastGoodResult(source, limit, xSignalPath, 'missing_x_signal_latest')
+
+  const raw = fs.readFileSync(xSignalPath, 'utf-8')
+  const parsed = parseXSignalPayload(raw)
+  if (!parsed.ok) return staleLastGoodResult(source, limit, xSignalPath, parsed.reason)
+
+  const result = buildFeedResultFromPayload({
+    parsed: parsed.payload,
+    source,
+    limit,
+    xSignalPath,
+    meta: buildXSignalMeta(parsed.payload),
+    emptyReason: 'no_data',
+  })
+
+  if (result.events.length > 0) writeLastGoodPayload(parsed.payload)
+  return result
 }
 
 function loadMockPayload(): MockPayload {
@@ -316,7 +451,7 @@ function selectFallbackEvents(payload: MockPayload, source: XSignalSource) {
   return filtered.length > 0 ? filtered : payload.events
 }
 
-function loadFallbackEvents(source: XSignalSource, limit = DEFAULT_LIMIT) {
+function loadFallbackEvents(source: XSignalSource, limit = DEFAULT_LIMIT): FeedResult {
   const payload = loadMockPayload()
   const mappedSource = mapMockSource(source)
   const selectedEvents = selectFallbackEvents(payload, source)
@@ -364,7 +499,9 @@ export async function handleHotboardFeedGet(request: Request): Promise<Response>
 
   const source = parsedSource.data as XSignalSource
   const xFeed = loadXFeedEvents(source)
-  const result = xFeed.events.length === 0 && shouldEnableMockFallback() ? loadFallbackEvents(source) : xFeed
+  const result = xFeed.events.length === 0 && xFeed.empty_reason === 'source_failure' && shouldEnableMockFallback()
+    ? loadFallbackEvents(source)
+    : xFeed
 
   return json({
     ok: true,
@@ -373,6 +510,7 @@ export async function handleHotboardFeedGet(request: Request): Promise<Response>
     generated_at: result.generated_at,
     data_source: result.data_source,
     fallback: result.fallback,
+    empty_reason: result.empty_reason,
     meta: result.meta,
     events: result.events,
   })

@@ -75,8 +75,10 @@ function resolveHotboardDbPath(dbPath?: string) {
   return path.join(os.homedir(), '.hermes', 'data', 'hotboard.sqlite')
 }
 
-function resolveXSignalLatestPath(filePath?: string) {
+export function resolveXSignalLatestPath(filePath?: string) {
   if (filePath?.trim()) return filePath.trim()
+  const explicit = process.env.HOTBOARD_X_SIGNAL_PATH?.trim()
+  if (explicit) return explicit
   return path.join(os.homedir(), '.hermes', 'tmp', 'x_signal_sync_latest.json')
 }
 

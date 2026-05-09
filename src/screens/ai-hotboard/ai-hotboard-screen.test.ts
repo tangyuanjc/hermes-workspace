@@ -174,6 +174,27 @@ describe('ai-hotboard screen handoff constraints', () => {
     expect(RECOMMEND_BANNER_CLASS).toContain('bg-emerald-950/70')
     expect(RECOMMEND_BANNER_CLASS).not.toContain('border-l')
   })
+
+  it('normalizes empty reason and renders stale source failure banner', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-06T13:00:00.000Z'))
+
+    const meta = normalizeFeedMeta({
+      status: 'stale',
+      stale: true,
+      partial_failures: ['missing_x_signal_latest'],
+      empty_reason: 'source_failure',
+      last_success_at: '2026-05-06T10:00:00.000Z',
+      source_failure_reason: 'missing_x_signal_latest',
+    })
+
+    expect(meta.empty_reason).toBe('source_failure')
+    expect(meta.status).toBe('stale')
+
+    render(createElement(FeedMetaBanners, { meta }))
+    expect(screen.getByText('数据源同步异常: missing_x_signal_latest')).toBeTruthy()
+    expect(screen.getByText('数据上次成功更新 3 小时前 (信源故障)')).toBeTruthy()
+  })
 })
 
 describe('FeedTimeline source user pill', () => {
