@@ -117,6 +117,7 @@ import { Route as AiHotboardSourcesHealthRouteImport } from './routes/ai-hotboar
 import { Route as AiHotboardSourceSourceRouteImport } from './routes/ai-hotboard/source/$source'
 import { Route as AiHotboardIntakeXiaojExecutionRouteImport } from './routes/ai-hotboard/intake/xiaoj-execution'
 import { Route as AiHotboardIntakeHermesStrategyRouteImport } from './routes/ai-hotboard/intake/hermes-strategy'
+import { Route as ApiSourcesHealthRetryRouteImport } from './routes/api/sources/health/retry'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 import { Route as ApiHotboardZaraRefreshRouteImport } from './routes/api/hotboard/zara/refresh'
@@ -668,6 +669,11 @@ const AiHotboardIntakeHermesStrategyRoute =
     path: '/intake/hermes-strategy',
     getParentRoute: () => AiHotboardRoute,
   } as any)
+const ApiSourcesHealthRetryRoute = ApiSourcesHealthRetryRouteImport.update({
+  id: '/retry',
+  path: '/retry',
+  getParentRoute: () => ApiSourcesHealthRoute,
+} as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
     id: '/$sessionKey/status',
@@ -813,7 +819,7 @@ export interface FileRoutesByFullPath {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
-  '/api/sources/health': typeof ApiSourcesHealthRoute
+  '/api/sources/health': typeof ApiSourcesHealthRouteWithChildren
   '/auth/email/verify': typeof AuthEmailVerifyRoute
   '/auth/feishu/callback': typeof AuthFeishuCallbackRoute
   '/api/hotboard/vote/aggregate': typeof ApiHotboardVoteAggregateRoute
@@ -823,6 +829,7 @@ export interface FileRoutesByFullPath {
   '/api/hotboard/zara/refresh': typeof ApiHotboardZaraRefreshRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/sources/health/retry': typeof ApiSourcesHealthRetryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -928,7 +935,7 @@ export interface FileRoutesByTo {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
-  '/api/sources/health': typeof ApiSourcesHealthRoute
+  '/api/sources/health': typeof ApiSourcesHealthRouteWithChildren
   '/auth/email/verify': typeof AuthEmailVerifyRoute
   '/auth/feishu/callback': typeof AuthFeishuCallbackRoute
   '/api/hotboard/vote/aggregate': typeof ApiHotboardVoteAggregateRoute
@@ -938,6 +945,7 @@ export interface FileRoutesByTo {
   '/api/hotboard/zara/refresh': typeof ApiHotboardZaraRefreshRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/sources/health/retry': typeof ApiSourcesHealthRetryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1046,7 +1054,7 @@ export interface FileRoutesById {
   '/api/skills/install': typeof ApiSkillsInstallRoute
   '/api/skills/toggle': typeof ApiSkillsToggleRoute
   '/api/skills/uninstall': typeof ApiSkillsUninstallRoute
-  '/api/sources/health': typeof ApiSourcesHealthRoute
+  '/api/sources/health': typeof ApiSourcesHealthRouteWithChildren
   '/auth/email/verify': typeof AuthEmailVerifyRoute
   '/auth/feishu/callback': typeof AuthFeishuCallbackRoute
   '/api/hotboard/vote/aggregate': typeof ApiHotboardVoteAggregateRoute
@@ -1056,6 +1064,7 @@ export interface FileRoutesById {
   '/api/hotboard/zara/refresh': typeof ApiHotboardZaraRefreshRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/sources/health/retry': typeof ApiSourcesHealthRetryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1175,6 +1184,7 @@ export interface FileRouteTypes {
     | '/api/hotboard/zara/refresh'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/sources/health/retry'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1290,6 +1300,7 @@ export interface FileRouteTypes {
     | '/api/hotboard/zara/refresh'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/sources/health/retry'
   id:
     | '__root__'
     | '/'
@@ -1407,6 +1418,7 @@ export interface FileRouteTypes {
     | '/api/hotboard/zara/refresh'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/sources/health/retry'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1485,7 +1497,7 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
-  ApiSourcesHealthRoute: typeof ApiSourcesHealthRoute
+  ApiSourcesHealthRoute: typeof ApiSourcesHealthRouteWithChildren
   AuthEmailVerifyRoute: typeof AuthEmailVerifyRoute
   AuthFeishuCallbackRoute: typeof AuthFeishuCallbackRoute
   ApiHotboardWechatFeedRoute: typeof ApiHotboardWechatFeedRoute
@@ -2252,6 +2264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AiHotboardIntakeHermesStrategyRouteImport
       parentRoute: typeof AiHotboardRoute
     }
+    '/api/sources/health/retry': {
+      id: '/api/sources/health/retry'
+      path: '/retry'
+      fullPath: '/api/sources/health/retry'
+      preLoaderRoute: typeof ApiSourcesHealthRetryRouteImport
+      parentRoute: typeof ApiSourcesHealthRoute
+    }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
       path: '/$sessionKey/status'
@@ -2459,6 +2478,17 @@ const ApiHotboardVoteRouteWithChildren = ApiHotboardVoteRoute._addFileChildren(
   ApiHotboardVoteRouteChildren,
 )
 
+interface ApiSourcesHealthRouteChildren {
+  ApiSourcesHealthRetryRoute: typeof ApiSourcesHealthRetryRoute
+}
+
+const ApiSourcesHealthRouteChildren: ApiSourcesHealthRouteChildren = {
+  ApiSourcesHealthRetryRoute: ApiSourcesHealthRetryRoute,
+}
+
+const ApiSourcesHealthRouteWithChildren =
+  ApiSourcesHealthRoute._addFileChildren(ApiSourcesHealthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
@@ -2535,7 +2565,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
-  ApiSourcesHealthRoute: ApiSourcesHealthRoute,
+  ApiSourcesHealthRoute: ApiSourcesHealthRouteWithChildren,
   AuthEmailVerifyRoute: AuthEmailVerifyRoute,
   AuthFeishuCallbackRoute: AuthFeishuCallbackRoute,
   ApiHotboardWechatFeedRoute: ApiHotboardWechatFeedRoute,

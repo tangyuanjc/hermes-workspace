@@ -2,6 +2,7 @@ import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { getSessionUser, isAuthenticated } from '../../../../server/auth-middleware'
+import { normalizeRole } from '../../../../server/auth-roles'
 import {
   WechatFetchError,
   WechatFetchTimeoutError,
@@ -31,7 +32,7 @@ export async function handleHotboardWechatIngestPost(request: Request): Promise<
     return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (sessionUser.role !== 'owner') {
+  if (normalizeRole(sessionUser.role) !== 'owner') {
     return json({ ok: false, error: 'Forbidden' }, { status: 403 })
   }
 

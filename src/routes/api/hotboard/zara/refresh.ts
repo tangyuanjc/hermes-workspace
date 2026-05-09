@@ -1,6 +1,7 @@
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { getSessionUser, isAuthenticated } from '../../../../server/auth-middleware'
+import { normalizeRole } from '../../../../server/auth-roles'
 import { scrapeZaraYoutubeLibrary } from '../../../../server/hotboard-zara-scraper'
 import { createZaraStore } from '../../../../server/hotboard-zara-store'
 import { rateLimit, rateLimitResponse, requireJsonContentType } from '../../../../server/rate-limit'
@@ -19,7 +20,7 @@ export async function handleHotboardZaraRefreshPost(request: Request): Promise<R
     return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (sessionUser.role !== 'owner') {
+  if (normalizeRole(sessionUser.role) !== 'owner') {
     return json({ ok: false, error: 'Forbidden' }, { status: 403 })
   }
 

@@ -10,7 +10,7 @@ afterEach(() => {
   resetAiHotboardAuthCacheForTests()
 })
 
-function authResponse(role: 'owner' | 'member', id = role) {
+function authResponse(role: 'owner' | 'member', id: string = role) {
   return new Response(JSON.stringify({
     authenticated: true,
     authRequired: true,

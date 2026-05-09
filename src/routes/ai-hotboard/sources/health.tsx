@@ -5,7 +5,9 @@ import { cn } from '@/lib/utils'
 import { useAiHotboardAuth } from '@/screens/ai-hotboard/ai-hotboard-auth'
 import { canAccessOwnerHotboardPanels } from '@/screens/ai-hotboard/ai-hotboard-screen'
 
-type SourceHealthEntry = {
+type SourceHealthStatus = 'green' | 'yellow' | 'red'
+
+type OwnerSourceHealthEntry = {
   id: string
   displayName: string
   kind: 'scheduler' | 'launchd' | 'manual'
@@ -14,8 +16,15 @@ type SourceHealthEntry = {
   last_failure_at: string | null
   last_failure_reason: string | null
   count: number
-  status: 'green' | 'yellow' | 'red'
+  status: SourceHealthStatus
 }
+
+type SafeSourceHealthEntry = {
+  source_name: string
+  status_chip: SourceHealthStatus
+}
+
+type SourceHealthEntry = OwnerSourceHealthEntry | SafeSourceHealthEntry
 
 type HealthPayload = {
   sources: SourceHealthEntry[]
@@ -61,6 +70,22 @@ function formatRelativeTime(value: string | null) {
   return `${Math.round(absMs / day)} 天${suffix}`
 }
 
+function isOwnerSourceHealthEntry(source: SourceHealthEntry): source is OwnerSourceHealthEntry {
+  return 'id' in source
+}
+
+function getSourceStatus(source: SourceHealthEntry): SourceHealthStatus {
+  return isOwnerSourceHealthEntry(source) ? source.status : source.status_chip
+}
+
+function getSourceName(source: SourceHealthEntry): string {
+  return isOwnerSourceHealthEntry(source) ? source.displayName : source.source_name
+}
+
+function getSourceKey(source: SourceHealthEntry): string {
+  return isOwnerSourceHealthEntry(source) ? source.id : source.source_name
+}
+
 function SourceHealthRoute() {
   usePrepareAiHotboardPage()
   const { authUser, authResolved } = useAiHotboardAuth()
@@ -87,17 +112,12 @@ function SourceHealthRoute() {
 
   useEffect(() => {
     if (!authResolved) return
-    if (!isOwner) {
-      setLoading(false)
-      return
-    }
-
     void fetchHealth()
-  }, [authResolved, fetchHealth, isOwner])
+  }, [authResolved, fetchHealth])
 
   const statusSummary = useMemo(() => {
-    return sources.reduce<Record<SourceHealthEntry['status'], number>>((acc, source) => {
-      acc[source.status] += 1
+    return sources.reduce<Record<SourceHealthStatus, number>>((acc, source) => {
+      acc[getSourceStatus(source)] += 1
       return acc
     }, { green: 0, yellow: 0, red: 0 })
   }, [sources])
@@ -107,7 +127,7 @@ function SourceHealthRoute() {
     setRetryingId(sourceId)
     setError(null)
     try {
-      const response = await fetch('/api/sources/health', {
+      const response = await fetch('/api/sources/health/retry', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ source_id: sourceId }),
@@ -131,29 +151,6 @@ function SourceHealthRoute() {
     )
   }
 
-  if (!isOwner) {
-    return (
-      <main className="min-h-screen bg-slate-950 px-5 py-6 text-slate-100 sm:px-8 lg:px-10">
-        <section className="mx-auto max-w-6xl rounded-[28px] border border-white/10 bg-slate-900/80 p-6 shadow-[0_24px_72px_rgba(2,6,23,0.52)]">
-          <div className="text-[11px] tracking-[0.3em] text-amber-300/80">OWNER ONLY</div>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">需要 owner 权限</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">信源健康包含内部触发器和运行细节，仅对 owner 开放。</p>
-          <a
-            href="https://applink.feishu.cn/client/chat/open?openId=ou_01e621b00ca6ba95e9a1e10bb444c9ae"
-            className="mt-4 inline-flex text-sm text-cyan-200 underline decoration-cyan-300/40 underline-offset-4 hover:text-cyan-100"
-          >
-            联系 JC 申请 owner 权限
-          </a>
-          <div className="mt-4">
-            <Link to="/ai-hotboard" className="rounded-2xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:border-cyan-300/40 hover:text-white">
-              返回热榜
-            </Link>
-          </div>
-        </section>
-      </main>
-    )
-  }
-
   return (
     <main className="min-h-screen bg-slate-950 px-5 py-6 text-slate-100 sm:px-8 lg:px-10">
       <section className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -163,7 +160,9 @@ function SourceHealthRoute() {
               <div className="text-[11px] tracking-[0.3em] text-cyan-300/80">SOURCE HEALTH</div>
               <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">信源健康</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-                统一观测 Zara、X、公众号和 JC 手挑对谈的触发状态、最近成功时间和记录数量。
+                {isOwner
+                  ? '统一观测 Zara、X、公众号和 JC 手挑对谈的触发状态、最近成功时间和记录数量。'
+                  : '成员视图仅展示业务信源名与健康状态, 不暴露 source id、触发器、路径或错误细节。'}
               </p>
             </div>
             <Link to="/ai-hotboard" className="rounded-2xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:border-cyan-300/40 hover:text-white">
@@ -185,42 +184,52 @@ function SourceHealthRoute() {
           <div className="rounded-[28px] border border-white/10 bg-slate-900/75 p-6 text-slate-400">正在读取信源健康...</div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {sources.map((source) => (
-              <article key={source.id} className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 shadow-[0_20px_56px_rgba(2,6,23,0.42)]">
+            {sources.map((source) => {
+              const status = getSourceStatus(source)
+              const isDetailed = isOwnerSourceHealthEntry(source)
+
+              return (
+              <article key={getSourceKey(source)} className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5 shadow-[0_20px_56px_rgba(2,6,23,0.42)]">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
-                      <span className={cn('size-2.5 rounded-full', STATUS_DOT_CLASSES[source.status])} />
-                      {STATUS_LABELS[source.status]}
+                      <span className={cn('size-2.5 rounded-full', STATUS_DOT_CLASSES[status])} />
+                      {STATUS_LABELS[status]}
                     </div>
-                    <h2 className="mt-3 text-2xl font-semibold text-white">{source.displayName}</h2>
+                    <h2 className="mt-3 text-2xl font-semibold text-white">{getSourceName(source)}</h2>
                   </div>
-                  <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs text-cyan-100">
-                    {KIND_LABELS[source.kind]}
-                  </span>
+                  {isDetailed ? (
+                    <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs text-cyan-100">
+                      {KIND_LABELS[source.kind]}
+                    </span>
+                  ) : null}
                 </div>
 
-                <dl className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                    <dt className="text-xs text-slate-500">last_success</dt>
-                    <dd className="mt-1 text-base text-slate-100">{formatRelativeTime(source.last_success_at)}</dd>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
-                    <dt className="text-xs text-slate-500">count</dt>
-                    <dd className="mt-1 text-2xl font-semibold text-slate-100">{source.count}</dd>
-                  </div>
-                </dl>
+                {isDetailed ? (
+                  <dl className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                      <dt className="text-xs text-slate-500">last_success</dt>
+                      <dd className="mt-1 text-base text-slate-100">{formatRelativeTime(source.last_success_at)}</dd>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+                      <dt className="text-xs text-slate-500">count</dt>
+                      <dd className="mt-1 text-2xl font-semibold text-slate-100">{source.count}</dd>
+                    </div>
+                  </dl>
+                ) : null}
 
-                <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/45 px-3 py-2 text-xs text-slate-400">
-                  {source.trigger}
-                </div>
-                {source.last_failure_reason ? (
+                {isDetailed ? (
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/45 px-3 py-2 text-xs text-slate-400">
+                    {source.trigger}
+                  </div>
+                ) : null}
+                {isDetailed && source.last_failure_reason ? (
                   <div className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/8 px-3 py-2 text-xs text-amber-100">
                     {source.last_failure_reason}
                   </div>
                 ) : null}
 
-                {isOwner ? (
+                {isOwner && isDetailed ? (
                   <button
                     type="button"
                     onClick={() => void retryNow(source.id)}
@@ -231,7 +240,8 @@ function SourceHealthRoute() {
                   </button>
                 ) : null}
               </article>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
