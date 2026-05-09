@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { fetchHermesAuthStatus, type AuthUser } from '@/lib/hermes-auth'
 
 type AiHotboardAuthSnapshot = {
@@ -31,6 +31,7 @@ let cachedAuthSnapshotFetchedAtMs = 0
 let pendingAuthSnapshot: Promise<AiHotboardAuthSnapshot> | null = null
 
 const DEFAULT_AUTH_CACHE_TTL_MS = 60_000
+const DEFAULT_AUTH_REVALIDATE_INTERVAL_MS = 60_000
 const AUTH_SYNC_CHANNEL_NAME = 'ai-hotboard-auth'
 const AUTH_SYNC_STORAGE_KEY = 'ai-hotboard-auth-sync'
 
@@ -47,6 +48,71 @@ function resolveAuthCacheTtlMs() {
   const configured = Number.parseInt(import.meta.env.VITE_HOTBOARD_AUTH_CACHE_TTL_MS ?? '', 10)
   if (Number.isFinite(configured) && configured >= 0) return configured
   return DEFAULT_AUTH_CACHE_TTL_MS
+}
+
+export function resolveAuthRevalidateIntervalMs() {
+  const env = import.meta.env as Record<string, string | undefined>
+  const configured = Number.parseInt(
+    env.HOTBOARD_AUTH_REVALIDATE_INTERVAL_MS ?? env.VITE_HOTBOARD_AUTH_REVALIDATE_INTERVAL_MS ?? '',
+    10,
+  )
+  if (Number.isFinite(configured) && configured > 0) return configured
+  return DEFAULT_AUTH_REVALIDATE_INTERVAL_MS
+}
+
+export function redirectToAiHotboardLogin() {
+  if (typeof window === 'undefined') return
+  if (window.location.pathname !== '/ai-hotboard') {
+    window.history.replaceState(null, '', '/ai-hotboard')
+  }
+}
+
+export function startAiHotboardAuthRevalidationTimer({
+  refreshAuth,
+  documentRef = typeof document === 'undefined' ? null : document,
+  intervalMs = resolveAuthRevalidateIntervalMs(),
+}: {
+  refreshAuth: () => void | Promise<void>
+  documentRef?: Document | null
+  intervalMs?: number
+}) {
+  if (!documentRef) return () => {}
+
+  let timer: ReturnType<typeof setInterval> | null = null
+
+  const stopTimer = () => {
+    if (!timer) return
+    clearInterval(timer)
+    timer = null
+  }
+
+  const revalidateIfVisible = () => {
+    if (documentRef.visibilityState === 'hidden') return
+    void refreshAuth()
+  }
+
+  const startTimer = () => {
+    if (timer || documentRef.visibilityState === 'hidden') return
+    timer = setInterval(revalidateIfVisible, intervalMs)
+  }
+
+  const handleVisibilityChange = () => {
+    if (documentRef.visibilityState === 'hidden') {
+      stopTimer()
+      return
+    }
+
+    startTimer()
+    revalidateIfVisible()
+  }
+
+  startTimer()
+  documentRef.addEventListener('visibilitychange', handleVisibilityChange)
+
+  return () => {
+    stopTimer()
+    documentRef.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
 }
 
 function isCachedAuthSnapshotFresh() {
@@ -163,6 +229,7 @@ export function AiHotboardAuthProvider({ children }: { children: ReactNode }) {
   const [authSnapshot, setAuthSnapshot] = useState<AiHotboardAuthSnapshot>(
     () => cachedAuthSnapshot ?? UNRESOLVED_AUTH_SNAPSHOT,
   )
+  const stopAuthRevalidationRef = useRef<() => void>(() => {})
 
   const refreshAuth = useCallback(async () => {
     const snapshot = await fetchCachedAuthSnapshot({ force: true })
@@ -190,13 +257,30 @@ export function AiHotboardAuthProvider({ children }: { children: ReactNode }) {
     }
 
     window.addEventListener('focus', revalidateOnFocus)
-    document.addEventListener('visibilitychange', revalidateOnFocus)
 
     return () => {
       window.removeEventListener('focus', revalidateOnFocus)
-      document.removeEventListener('visibilitychange', revalidateOnFocus)
     }
   }, [refreshAuth])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    if (authSnapshot.authRequired) {
+      stopAuthRevalidationRef.current()
+      stopAuthRevalidationRef.current = () => {}
+      return undefined
+    }
+
+    const stopTimer = startAiHotboardAuthRevalidationTimer({ refreshAuth })
+    stopAuthRevalidationRef.current = stopTimer
+
+    return () => {
+      stopTimer()
+      if (stopAuthRevalidationRef.current === stopTimer) {
+        stopAuthRevalidationRef.current = () => {}
+      }
+    }
+  }, [authSnapshot.authRequired, refreshAuth])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
@@ -207,6 +291,8 @@ export function AiHotboardAuthProvider({ children }: { children: ReactNode }) {
     function handleAuthSync(message: AuthSyncMessage) {
       clearAiHotboardAuthCache()
       if (message.reason === 'logout') {
+        stopAuthRevalidationRef.current()
+        stopAuthRevalidationRef.current = () => {}
         setAuthSnapshot({
           authUser: null,
           authResolved: true,
@@ -214,6 +300,8 @@ export function AiHotboardAuthProvider({ children }: { children: ReactNode }) {
           authCheckError: null,
           sessionVersion: `logout:${message.sentAt}`,
         })
+        redirectToAiHotboardLogin()
+        return
       }
 
       void fetchCachedAuthSnapshot({ force: true }).then((snapshot) => {
