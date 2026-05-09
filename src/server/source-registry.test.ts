@@ -87,7 +87,11 @@ describe('source registry health', () => {
     createZaraDb(zaraDbPath, '2026-04-26T11:30:00.000Z')
     fs.writeFileSync(xSignalLatestPath, JSON.stringify({
       generated_at: '2026-04-26T10:00:00.000Z',
-      counts: { bookmarks: 3, likes: 2 },
+      counts: {
+        bookmarks: { total: 3, by_user: { self: 3 } },
+        likes: { total: 2, by_user: { self: 2 } },
+        following: { total: 0, by_user: { self: 0 } },
+      },
     }))
 
     const sources = await listSourceHealth({
@@ -116,6 +120,7 @@ describe('source registry health', () => {
       counts: {
         bookmarks: { total: 73, by_user: { tangyuanjc: 73 } },
         likes: { total: 0, by_user: { tangyuanjc: 0 } },
+        following: { total: 0, by_user: { tangyuanjc: 0 } },
       },
     }))
 

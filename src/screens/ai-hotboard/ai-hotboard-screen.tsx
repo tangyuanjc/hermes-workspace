@@ -48,6 +48,7 @@ type FeedMeta = {
   stale: boolean
   partial_failures: string[]
   empty_reason?: 'no_data' | 'source_failure' | 'permission_denied'
+  freshness_hours?: number
   last_success_at?: string | null
   source_failure_reason?: string | null
 }
@@ -228,6 +229,9 @@ export function normalizeFeedMeta(meta?: Partial<FeedMeta>): FeedMeta {
       ? meta.partial_failures.map((item) => String(item))
       : [],
     empty_reason: emptyReason,
+    freshness_hours: typeof meta?.freshness_hours === 'number' && Number.isFinite(meta.freshness_hours) && meta.freshness_hours > 0
+      ? meta.freshness_hours
+      : undefined,
     last_success_at: typeof meta?.last_success_at === 'string' ? meta.last_success_at : null,
     source_failure_reason: typeof meta?.source_failure_reason === 'string' ? meta.source_failure_reason : null,
   }
@@ -1091,7 +1095,9 @@ export function FeedMetaBanners({ meta }: { meta: FeedMeta }) {
         <div className="rounded-lg border border-slate-300/20 bg-slate-700/30 px-4 py-3 text-sm text-slate-300/80">
           {isSourceFailure
             ? `数据上次成功更新 ${formatRelativeAge(meta.last_success_at)} (信源故障)`
-            : '数据距上次同步 24h+, 可能过时'}
+            : meta.freshness_hours
+              ? `数据超过 ${meta.freshness_hours}h 新鲜度阈值, 可能过时`
+              : '数据超过新鲜度阈值, 可能过时'}
         </div>
       ) : null}
     </div>

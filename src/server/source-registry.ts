@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import { DatabaseSync } from 'node:sqlite'
 import { scrapeZaraYoutubeLibrary } from './hotboard-zara-scraper'
 import { createZaraStore } from './hotboard-zara-store'
+import { X_SIGNAL_PAYLOAD_SCHEMA, sumXSignalCounts } from '../types/x-signal-payload'
 
 const execFileAsync = promisify(execFile)
 
@@ -166,25 +167,19 @@ function readXSignalHealth(filePath: string, nowMs: number) {
   }
 
   try {
-    const payload = JSON.parse(fs.readFileSync(filePath, 'utf8')) as {
-      generated_at?: string
-      counts?: Record<string, unknown>
-      count?: number
-      total?: number
+    const rawPayload = JSON.parse(fs.readFileSync(filePath, 'utf8')) as {
       last_failure_at?: string | null
       last_failure_reason?: string | null
     }
-    const count: number = typeof payload.count === 'number'
-      ? payload.count
-      : typeof payload.total === 'number'
-        ? payload.total
-        : sumXSignalCounts(payload.counts ?? {})
+    const parsed = X_SIGNAL_PAYLOAD_SCHEMA.safeParse(rawPayload)
+    if (!parsed.success) throw new Error('invalid_x_signal_schema')
+    const count = sumXSignalCounts(parsed.data.counts)
 
     return calculateSourceHealth({
       intervalMs: X_SIGNAL_INTERVAL_MS,
-      lastSuccessAt: payload.generated_at ?? null,
-      lastFailureAt: payload.last_failure_at ?? null,
-      lastFailureReason: payload.last_failure_reason ?? null,
+      lastSuccessAt: parsed.data.generated_at,
+      lastFailureAt: rawPayload.last_failure_at ?? null,
+      lastFailureReason: rawPayload.last_failure_reason ?? null,
       count,
       nowMs,
     })
@@ -198,19 +193,6 @@ function readXSignalHealth(filePath: string, nowMs: number) {
       status: 'red' as const,
     }
   }
-}
-
-function readXSignalCountValue(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (value && typeof value === 'object') {
-    const total = (value as { total?: unknown }).total
-    if (typeof total === 'number' && Number.isFinite(total)) return total
-  }
-  return 0
-}
-
-function sumXSignalCounts(counts: Record<string, unknown>): number {
-  return Object.values(counts).reduce<number>((sum, value) => sum + readXSignalCountValue(value), 0)
 }
 
 function openRetryDb(dbPath: string) {

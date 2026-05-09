@@ -6,34 +6,10 @@ import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import { isAuthenticated } from './auth-middleware'
 import { resolveXSignalLatestPath } from './source-registry'
+import { X_SIGNAL_PAYLOAD_SCHEMA, type XSignalPayload, type XTweet } from '../types/x-signal-payload'
 
 type XEventSource = 'x-bookmarks' | 'x-likes' | 'x-following' | 'x-for_you'
 type XSignalSource = XEventSource | 'all' | 'low-follower'
-
-type XTweet = {
-  id?: string
-  author?: string
-  name?: string
-  source_user?: string
-  text?: string
-  likes?: number
-  retweets?: number
-  views?: number
-  replies?: number
-  created_at?: string
-  url?: string
-}
-
-type XSignalPayload = {
-  ok?: boolean
-  errors?: Record<string, unknown>
-  counts: Record<string, unknown>
-  bookmarks?: XTweet[]
-  likes?: XTweet[]
-  following?: XTweet[]
-  for_you?: XTweet[]
-  generated_at: string
-}
 
 type EmptyReason = 'no_data' | 'source_failure' | 'permission_denied'
 
@@ -42,6 +18,7 @@ type FeedMeta = {
   stale: boolean
   partial_failures: string[]
   empty_reason?: EmptyReason
+  freshness_hours?: number
   last_success_at?: string | null
   source_failure_reason?: string | null
 }
@@ -107,19 +84,14 @@ const SOURCE_MAP: Record<XEventSource, keyof XSignalPayload> = {
 }
 const SOURCE_KEYS = Object.keys(SOURCE_MAP) as XEventSource[]
 const DEFAULT_LIMIT = 30
-const X_SIGNAL_STALE_MS = 24 * 60 * 60 * 1000
+const DEFAULT_FEED_FRESHNESS_HOURS = 24
 const MOCK_FEED_FILE_NAME = ['ai_hotboard', 'mock_events.json'].join('_')
-const X_TWEET_SCHEMA = z.record(z.unknown())
-const X_SIGNAL_PAYLOAD_SCHEMA = z.object({
-  generated_at: z.string().trim().min(1),
-  counts: z.record(z.unknown()),
-  ok: z.boolean().optional(),
-  errors: z.record(z.unknown()).optional(),
-  bookmarks: z.array(X_TWEET_SCHEMA).optional(),
-  likes: z.array(X_TWEET_SCHEMA).optional(),
-  following: z.array(X_TWEET_SCHEMA).optional(),
-  for_you: z.array(X_TWEET_SCHEMA).optional(),
-}).passthrough()
+
+function resolveFeedFreshnessHours() {
+  const configured = Number.parseFloat(process.env.HOTBOARD_FEED_FRESHNESS_HOURS ?? '')
+  if (Number.isFinite(configured) && configured > 0) return configured
+  return DEFAULT_FEED_FRESHNESS_HOURS
+}
 
 function resolveXSignalPath() {
   return resolveXSignalLatestPath()
@@ -238,26 +210,14 @@ type ParseXSignalPayloadResult =
   | { ok: true; payload: XSignalPayload }
   | { ok: false; reason: 'invalid_x_signal_latest' | 'invalid_x_signal_schema' }
 
-function isValidCountValue(value: unknown): boolean {
-  if (typeof value === 'number') return Number.isFinite(value) && value >= 0
-  if (value && typeof value === 'object') {
-    const total = (value as { total?: unknown }).total
-    return typeof total === 'number' && Number.isFinite(total) && total >= 0
-  }
-  return false
-}
-
 function hasValidCounts(payload: XSignalPayload) {
-  const countValues = Object.values(payload.counts)
-  if (countValues.some((value) => !isValidCountValue(value))) return false
-
   if (payload.ok === false) return true
 
   return SOURCE_KEYS.every((key) => {
     const countValue = payload.counts[SOURCE_MAP[key]]
     const items = payload[SOURCE_MAP[key]]
-    if (typeof countValue !== 'number' || !Array.isArray(items)) return true
-    return countValue >= items.length
+    if (!countValue || !Array.isArray(items)) return true
+    return countValue.total >= items.length
   })
 }
 
@@ -277,18 +237,20 @@ function parseXSignalPayload(raw: string): ParseXSignalPayloadResult {
   }
 }
 
-function isStaleGeneratedAt(value: string) {
+function isStaleGeneratedAt(value: string, freshnessHours = resolveFeedFreshnessHours()) {
   const timestamp = Date.parse(value)
   if (Number.isNaN(timestamp)) return true
-  return Date.now() - timestamp > X_SIGNAL_STALE_MS
+  return Date.now() - timestamp > freshnessHours * 60 * 60 * 1000
 }
 
 function buildXSignalMeta(parsed: XSignalPayload): FeedMeta {
   const partialFailures = Object.keys(parsed.errors ?? {})
-  const stale = isStaleGeneratedAt(parsed.generated_at)
+  const freshnessHours = resolveFeedFreshnessHours()
+  const stale = isStaleGeneratedAt(parsed.generated_at, freshnessHours)
   return {
     status: stale ? 'stale' : 'fresh',
     stale,
+    freshness_hours: freshnessHours,
     partial_failures: parsed.ok === false && partialFailures.length === 0 ? ['unknown'] : partialFailures,
     last_success_at: parsed.generated_at,
   }

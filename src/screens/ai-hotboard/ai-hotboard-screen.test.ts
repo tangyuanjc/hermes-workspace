@@ -404,7 +404,7 @@ describe('FeedMetaBanners', () => {
 
     expect(response.events).toHaveLength(0)
     expect(screen.getByText('数据源同步异常: x:bookmarks')).toBeTruthy()
-    expect(screen.getByText('数据距上次同步 24h+, 可能过时')).toBeTruthy()
+    expect(screen.getByText('数据超过新鲜度阈值, 可能过时')).toBeTruthy()
 
     cleanup()
   })
@@ -413,7 +413,15 @@ describe('FeedMetaBanners', () => {
     render(createElement(FeedMetaBanners, { meta: { stale: true, partial_failures: ['jc:bookmarks', 'x:likes'] } }))
 
     expect(screen.getByText('数据源同步异常: jc:bookmarks, x:likes')).toBeTruthy()
-    expect(screen.getByText('数据距上次同步 24h+, 可能过时')).toBeTruthy()
+    expect(screen.getByText('数据超过新鲜度阈值, 可能过时')).toBeTruthy()
+
+    cleanup()
+  })
+
+  it('shows the configured freshness window when provided by feed meta', () => {
+    render(createElement(FeedMetaBanners, { meta: { stale: true, partial_failures: [], freshness_hours: 1 } }))
+
+    expect(screen.getByText('数据超过 1h 新鲜度阈值, 可能过时')).toBeTruthy()
 
     cleanup()
   })

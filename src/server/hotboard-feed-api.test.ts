@@ -10,6 +10,7 @@ const originalXFeedPath = process.env.HOTBOARD_X_SIGNAL_PATH
 const originalLastGoodPath = process.env.HOTBOARD_FEED_LASTGOOD_PATH
 const originalAuthDbPath = process.env.HERMES_AUTH_DB_PATH
 const originalMockFallback = process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK
+const originalFeedFreshnessHours = process.env.HOTBOARD_FEED_FRESHNESS_HOURS
 
 afterEach(() => {
   if (originalXFeedPath === undefined) {
@@ -34,6 +35,12 @@ afterEach(() => {
     delete process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK
   } else {
     process.env.HOTBOARD_ENABLE_MOCK_FEED_FALLBACK = originalMockFallback
+  }
+
+  if (originalFeedFreshnessHours === undefined) {
+    delete process.env.HOTBOARD_FEED_FRESHNESS_HOURS
+  } else {
+    process.env.HOTBOARD_FEED_FRESHNESS_HOURS = originalFeedFreshnessHours
   }
 
   while (tempDirs.length > 0) {
@@ -70,15 +77,30 @@ function setupTempAuth() {
 function withValidFeedDefaults(payload: unknown) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload
   const record = payload as Record<string, unknown>
+  const countFor = (key: string) => {
+    const value = record[key]
+    const total = Array.isArray(value) ? value.length : 0
+    return { total, by_user: { self: total } }
+  }
   return {
     generated_at: '2026-05-06T10:00:00.000Z',
     counts: {
-      bookmarks: Array.isArray(record.bookmarks) ? record.bookmarks.length : 0,
-      likes: Array.isArray(record.likes) ? record.likes.length : 0,
-      following: Array.isArray(record.following) ? record.following.length : 0,
-      for_you: Array.isArray(record.for_you) ? record.for_you.length : 0,
+      bookmarks: countFor('bookmarks'),
+      likes: countFor('likes'),
+      following: countFor('following'),
+      for_you: countFor('for_you'),
     },
     ...record,
+  }
+}
+
+function xSignalCounts(overrides: Partial<Record<'bookmarks' | 'likes' | 'following' | 'for_you', number>> = {}) {
+  const build = (total: number) => ({ total, by_user: { self: total } })
+  return {
+    bookmarks: build(overrides.bookmarks ?? 0),
+    likes: build(overrides.likes ?? 0),
+    following: build(overrides.following ?? 0),
+    for_you: build(overrides.for_you ?? 0),
   }
 }
 
@@ -393,7 +415,7 @@ describe('hotboard feed api handlers', () => {
       errors: {
         'jc:bookmarks': 'rate limited',
       },
-      counts: { bookmarks: 0 },
+      counts: xSignalCounts({ bookmarks: 1 }),
       generated_at: new Date().toISOString(),
       bookmarks: [
         {
@@ -448,9 +470,69 @@ describe('hotboard feed api handlers', () => {
     expect(payload.meta.partial_failures).toEqual([])
   })
 
+  it('marks x feed meta stale using HOTBOARD_FEED_FRESHNESS_HOURS', async () => {
+    process.env.HOTBOARD_FEED_FRESHNESS_HOURS = '1'
+    createTempFeedFile({
+      ok: true,
+      errors: {},
+      counts: xSignalCounts({ bookmarks: 1 }),
+      generated_at: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+      bookmarks: [
+        {
+          id: 'tweet-stale-env',
+          text: 'stale by env threshold',
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    }, { withDefaults: false })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const payload = (await response.json()) as { meta: { stale: boolean; freshness_hours?: number } }
+
+    expect(payload.meta.stale).toBe(true)
+    expect(payload.meta.freshness_hours).toBe(1)
+  })
+
+  it('marks numeric count payloads stale instead of treating them as fresh', async () => {
+    createTempFeedFile({
+      ok: true,
+      errors: {},
+      counts: { bookmarks: 1, likes: 0, following: 0 },
+      generated_at: new Date().toISOString(),
+      bookmarks: [
+        {
+          id: 'tweet-numeric-counts',
+          text: 'schema drift tweet',
+          created_at: 'Wed Apr 16 12:00:00 +0000 2026',
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    }, { withDefaults: false })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    const payload = (await response.json()) as {
+      count: number
+      empty_reason?: string
+      meta: { status?: string; stale: boolean; partial_failures: string[] }
+      events: Array<Record<string, unknown>>
+    }
+
+    expect(payload.count).toBe(0)
+    expect(payload.events).toEqual([])
+    expect(payload.empty_reason).toBe('source_failure')
+    expect(payload.meta.status).toBe('stale')
+    expect(payload.meta.stale).toBe(true)
+    expect(payload.meta.partial_failures).toContain('invalid_x_signal_schema')
+  })
+
   it('marks schema-invalid x payload stale instead of treating it as fresh', async () => {
     createTempFeedFile({
-      counts: { bookmarks: 1 },
+      counts: xSignalCounts({ bookmarks: 1 }),
       bookmarks: [
         {
           id: 'tweet-missing-generated-at',
@@ -483,7 +565,7 @@ describe('hotboard feed api handlers', () => {
     const feedPath = createTempFeedFile({
       ok: true,
       errors: {},
-      counts: { bookmarks: 1 },
+      counts: xSignalCounts({ bookmarks: 1 }),
       generated_at: '2026-05-06T10:00:00.000Z',
       bookmarks: [
         {
@@ -524,7 +606,7 @@ describe('hotboard feed api handlers', () => {
     createTempFeedFile({
       ok: true,
       errors: {},
-      counts: { bookmarks: 0 },
+      counts: xSignalCounts({ bookmarks: 0 }),
       generated_at: new Date().toISOString(),
       bookmarks: [],
       likes: [],
