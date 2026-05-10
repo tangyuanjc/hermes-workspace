@@ -199,7 +199,8 @@ function imageResponse(body: Buffer, contentType: string, cacheStatus: 'HIT' | '
     headers: {
       'Content-Type': contentType,
       'Content-Length': String(body.byteLength),
-      'Cache-Control': `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`,
+      'Cache-Control': `private, max-age=${CACHE_MAX_AGE_SECONDS}`,
+      Vary: 'Cookie, Authorization',
       'X-Img-Proxy-Cache': cacheStatus,
       'X-Content-Type-Options': 'nosniff',
       'Content-Disposition': `inline; filename="${safeFilename(targetUrl, contentType)}"`,

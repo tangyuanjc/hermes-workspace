@@ -203,6 +203,10 @@ describe('img proxy API', () => {
     expect(first.headers.get('x-content-type-options')).toBe('nosniff')
     expect(first.headers.get('content-disposition')).toBe('inline; filename="avatar.png"')
     expect(first.headers.get('x-img-proxy-cache')).toBe('MISS')
+    expect(first.headers.get('cache-control')).toContain('private')
+    expect(first.headers.get('cache-control')).not.toContain('public')
+    expect(first.headers.get('cache-control')).not.toContain('immutable')
+    expect(first.headers.get('vary')).toContain('Cookie')
 
     const second = await handleImgProxyGet(request, {
       fetchImpl,
@@ -212,6 +216,19 @@ describe('img proxy API', () => {
     })
     expect(second.status).toBe(200)
     expect(second.headers.get('x-img-proxy-cache')).toBe('HIT')
+    expect(second.headers.get('cache-control')).toContain('private')
+    expect(second.headers.get('cache-control')).not.toContain('public')
+    expect(second.headers.get('cache-control')).not.toContain('immutable')
+    expect(second.headers.get('vary')).toContain('Cookie')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    const unauthenticated = await handleImgProxyGet(makeRequest('https://pbs.twimg.com/avatar.png'), {
+      fetchImpl,
+      cacheDir: tempDir,
+      now: () => new Date('2026-05-11T00:00:00.000Z'),
+      resolveHost: resolvePublicHost,
+    })
+    expect(unauthenticated.status).toBe(401)
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })
