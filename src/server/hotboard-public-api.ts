@@ -7,6 +7,7 @@ import { listRecentArticles, type WechatArticleRecord } from './hotboard-wechat-
 import { createZaraStore } from './hotboard-zara-store'
 import type { ZaraYoutubeItem } from './hotboard-zara-types'
 import { getClientIp, rateLimit } from './rate-limit'
+import { dateInShanghai } from '../lib/shanghai-date'
 
 type PublicView = 'owner' | 'member'
 type PublicSourceTier = 'T1' | 'T1.5' | 'T2'
@@ -41,7 +42,7 @@ const PUBLIC_RATE_LIMIT_BURST = 40
 const PUBLIC_RATE_LIMIT_WINDOW_MS = 60_000
 const PUBLIC_MAX_LIMIT = 50
 const PUBLIC_LOOKBACK_LIMIT = 500
-const TANGYUANJC_HOST_SUFFIX = '.tangyuanjc.com'
+const CORS_ALLOWED_HOSTS = new Set(['aihotboard.tangyuanjc.com', 'aihotboard-staging.tangyuanjc.com'])
 
 const DAILY_SECTIONS: Array<{ key: DailySectionKey; title: string }> = [
   { key: 'models', title: '模型与基础设施' },
@@ -52,7 +53,7 @@ const DAILY_SECTIONS: Array<{ key: DailySectionKey; title: string }> = [
 ]
 
 function todayDateString() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+  return dateInShanghai(new Date())
 }
 
 function normalizeDateParam(value: string | null) {
@@ -75,7 +76,12 @@ function publicId(parts: string[]) {
 function toDateKey(timestamp: string) {
   const parsed = Date.parse(timestamp)
   if (Number.isNaN(parsed)) return timestamp.slice(0, 10)
-  return new Date(parsed).toISOString().slice(0, 10)
+  return dateInShanghai(parsed)
+}
+
+function shanghaiDateDaysAgo(date: string, daysAgo: number) {
+  const [year, month, day] = date.split('-').map((part) => Number.parseInt(part, 10))
+  return dateInShanghai(new Date(Date.UTC(year, month - 1, day - daysAgo, 12)))
 }
 
 function sectionForText(input: string): DailySectionKey {
@@ -194,7 +200,7 @@ function corsHeaders(request: Request) {
 
   try {
     const hostname = new URL(origin).hostname
-    if (hostname === 'tangyuanjc.com' || hostname.endsWith(TANGYUANJC_HOST_SUFFIX)) {
+    if (CORS_ALLOWED_HOSTS.has(hostname)) {
       headers.set('Access-Control-Allow-Origin', origin)
       headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
       headers.set('Access-Control-Allow-Headers', 'Content-Type, User-Agent')
@@ -275,7 +281,6 @@ export async function handlePublicDailiesGet(request: Request): Promise<Response
   if (guard) return guard
 
   const today = todayDateString()
-  const start = Date.parse(`${today}T00:00:00.000Z`)
   const counts = new Map<string, number>()
   loadAllPublicItems().forEach((item) => {
     const key = toDateKey(item.timestamp)
@@ -283,7 +288,7 @@ export async function handlePublicDailiesGet(request: Request): Promise<Response
   })
 
   const dailies = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(start - index * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const date = shanghaiDateDaysAgo(today, index)
     return { date, count: counts.get(date) ?? 0 }
   })
 

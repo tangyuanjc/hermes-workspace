@@ -21,7 +21,7 @@ function writeXSignalPayload() {
     counts: {
       bookmarks: { total: 1, by_user: { jc: 1 } },
       likes: { total: 0, by_user: {} },
-      following: { total: 1, by_user: { jc: 1 } },
+      following: { total: 2, by_user: { jc: 2 } },
       for_you: { total: 0, by_user: {} },
     },
     ok: true,
@@ -54,6 +54,19 @@ function writeXSignalPayload() {
         views: 100,
         created_at: 'Sat May 09 02:00:00 +0000 2026',
         url: 'https://x.com/builder/status/tweet-old',
+        source_user: 'jc',
+      },
+      {
+        id: 'tweet-shanghai-early',
+        author: 'builder',
+        name: 'Builder',
+        text: 'Shanghai early morning AI workflow item',
+        likes: 7,
+        retweets: 2,
+        replies: 0,
+        views: 200,
+        created_at: 'Sat May 09 19:00:00 +0000 2026',
+        url: 'https://x.com/builder/status/tweet-shanghai-early',
         source_user: 'jc',
       },
     ],
@@ -140,7 +153,7 @@ describe('hotboard public API', () => {
 
     expect(body.date).toBe('2026-05-10')
     expect(body.view).toBe('member')
-    expect(body.count).toBe(3)
+    expect(body.count).toBe(4)
     expect(body.items[0]).toEqual({
       id: expect.stringMatching(/^pub_/),
       title: expect.any(String),
@@ -162,6 +175,7 @@ describe('hotboard public API', () => {
       'url',
     ])
     expect(body.items.some((item) => item.source === 'x-bookmarks')).toBe(false)
+    expect(body.items.some((item) => item.source === 'x-following')).toBe(false)
     expect(body.items.some((item) => item.source === 'wechat')).toBe(false)
     expect(body.items.some((item) => item.source === 'zara-youtube')).toBe(false)
   })
@@ -179,6 +193,7 @@ describe('hotboard public API', () => {
 
     expect(body.view).toBe('owner')
     expect(body.items.map((item) => item.source)).toContain('x-bookmarks')
+    expect(body.items.map((item) => item.source)).toContain('x-following')
     expect(body.items.map((item) => item.source)).toContain('wechat')
     expect(body.items.map((item) => item.source)).toContain('zara-youtube')
   })
@@ -189,7 +204,7 @@ describe('hotboard public API', () => {
     const body = (await response.json()) as { sections: Array<{ key: string; count: number; items: unknown[] }> }
 
     expect(body.sections.map((section) => section.key)).toEqual(['models', 'agents', 'tools', 'multimodal', 'industry'])
-    expect(body.sections.reduce((sum, section) => sum + section.count, 0)).toBe(3)
+    expect(body.sections.reduce((sum, section) => sum + section.count, 0)).toBe(4)
   })
 
   it('returns a seven day dailies list', async () => {
@@ -198,7 +213,7 @@ describe('hotboard public API', () => {
 
     expect(body.dailies).toHaveLength(7)
     expect(body.dailies[0]?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(body.dailies.some((entry) => entry.date === '2026-05-10' && entry.count === 3)).toBe(true)
+    expect(body.dailies.some((entry) => entry.date === '2026-05-10' && entry.count === 4)).toBe(true)
   })
 
   it('does not use user agent as an access-control boundary', async () => {
@@ -222,14 +237,14 @@ describe('hotboard public API', () => {
     expect(response.status).toBe(503)
   })
 
-  it('sets CORS only for tangyuanjc internal domains', async () => {
+  it('sets CORS only for exact ai-hotboard domains', async () => {
     const internal = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10', 'member', {
-      headers: { origin: 'https://paopao.tangyuanjc.com' },
+      headers: { origin: 'https://aihotboard.tangyuanjc.com' },
     }))
-    expect(internal.headers.get('access-control-allow-origin')).toBe('https://paopao.tangyuanjc.com')
+    expect(internal.headers.get('access-control-allow-origin')).toBe('https://aihotboard.tangyuanjc.com')
 
     const external = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10', 'member', {
-      headers: { origin: 'https://example.com' },
+      headers: { origin: 'https://evil.tangyuanjc.com' },
     }))
     expect(external.headers.get('access-control-allow-origin')).toBeNull()
   })
