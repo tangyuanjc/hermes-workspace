@@ -77,6 +77,9 @@ import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
 import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
 import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiPublicItemsRouteImport } from './routes/api/public/items'
+import { Route as ApiPublicDailyRouteImport } from './routes/api/public/daily'
+import { Route as ApiPublicDailiesRouteImport } from './routes/api/public/dailies'
 import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
 import { Route as ApiProfilesRenameRouteImport } from './routes/api/profiles/rename'
 import { Route as ApiProfilesReadRouteImport } from './routes/api/profiles/read'
@@ -466,6 +469,21 @@ const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   path: '/send',
   getParentRoute: () => ApiSessionsRoute,
 } as any)
+const ApiPublicItemsRoute = ApiPublicItemsRouteImport.update({
+  id: '/api/public/items',
+  path: '/api/public/items',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDailyRoute = ApiPublicDailyRouteImport.update({
+  id: '/api/public/daily',
+  path: '/api/public/daily',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDailiesRoute = ApiPublicDailiesRouteImport.update({
+  id: '/api/public/dailies',
+  path: '/api/public/dailies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
   id: '/api/profiles/update',
   path: '/api/profiles/update',
@@ -814,6 +832,9 @@ export interface FileRoutesByFullPath {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/public/dailies': typeof ApiPublicDailiesRoute
+  '/api/public/daily': typeof ApiPublicDailyRoute
+  '/api/public/items': typeof ApiPublicItemsRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -930,6 +951,9 @@ export interface FileRoutesByTo {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/public/dailies': typeof ApiPublicDailiesRoute
+  '/api/public/daily': typeof ApiPublicDailyRoute
+  '/api/public/items': typeof ApiPublicItemsRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -1049,6 +1073,9 @@ export interface FileRoutesById {
   '/api/profiles/read': typeof ApiProfilesReadRoute
   '/api/profiles/rename': typeof ApiProfilesRenameRoute
   '/api/profiles/update': typeof ApiProfilesUpdateRoute
+  '/api/public/dailies': typeof ApiPublicDailiesRoute
+  '/api/public/daily': typeof ApiPublicDailyRoute
+  '/api/public/items': typeof ApiPublicItemsRoute
   '/api/sessions/send': typeof ApiSessionsSendRoute
   '/api/skills/hub-search': typeof ApiSkillsHubSearchRoute
   '/api/skills/install': typeof ApiSkillsInstallRoute
@@ -1169,6 +1196,9 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/public/dailies'
+    | '/api/public/daily'
+    | '/api/public/items'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
@@ -1285,6 +1315,9 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/public/dailies'
+    | '/api/public/daily'
+    | '/api/public/items'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
@@ -1403,6 +1436,9 @@ export interface FileRouteTypes {
     | '/api/profiles/read'
     | '/api/profiles/rename'
     | '/api/profiles/update'
+    | '/api/public/dailies'
+    | '/api/public/daily'
+    | '/api/public/items'
     | '/api/sessions/send'
     | '/api/skills/hub-search'
     | '/api/skills/install'
@@ -1497,6 +1533,9 @@ export interface RootRouteChildren {
   ApiProfilesReadRoute: typeof ApiProfilesReadRoute
   ApiProfilesRenameRoute: typeof ApiProfilesRenameRoute
   ApiProfilesUpdateRoute: typeof ApiProfilesUpdateRoute
+  ApiPublicDailiesRoute: typeof ApiPublicDailiesRoute
+  ApiPublicDailyRoute: typeof ApiPublicDailyRoute
+  ApiPublicItemsRoute: typeof ApiPublicItemsRoute
   ApiSourcesHealthRoute: typeof ApiSourcesHealthRouteWithChildren
   AuthEmailVerifyRoute: typeof AuthEmailVerifyRoute
   AuthFeishuCallbackRoute: typeof AuthFeishuCallbackRoute
@@ -1983,6 +2022,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sessions/send'
       preLoaderRoute: typeof ApiSessionsSendRouteImport
       parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/public/items': {
+      id: '/api/public/items'
+      path: '/api/public/items'
+      fullPath: '/api/public/items'
+      preLoaderRoute: typeof ApiPublicItemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/daily': {
+      id: '/api/public/daily'
+      path: '/api/public/daily'
+      fullPath: '/api/public/daily'
+      preLoaderRoute: typeof ApiPublicDailyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dailies': {
+      id: '/api/public/dailies'
+      path: '/api/public/dailies'
+      fullPath: '/api/public/dailies'
+      preLoaderRoute: typeof ApiPublicDailiesRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/profiles/update': {
       id: '/api/profiles/update'
@@ -2565,6 +2625,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfilesReadRoute: ApiProfilesReadRoute,
   ApiProfilesRenameRoute: ApiProfilesRenameRoute,
   ApiProfilesUpdateRoute: ApiProfilesUpdateRoute,
+  ApiPublicDailiesRoute: ApiPublicDailiesRoute,
+  ApiPublicDailyRoute: ApiPublicDailyRoute,
+  ApiPublicItemsRoute: ApiPublicItemsRoute,
   ApiSourcesHealthRoute: ApiSourcesHealthRouteWithChildren,
   AuthEmailVerifyRoute: AuthEmailVerifyRoute,
   AuthFeishuCallbackRoute: AuthFeishuCallbackRoute,

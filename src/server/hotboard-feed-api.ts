@@ -9,7 +9,7 @@ import { resolveXSignalLatestPath } from './source-registry'
 import { X_SIGNAL_PAYLOAD_SCHEMA, type XSignalPayload, type XTweet } from '../types/x-signal-payload'
 
 type XEventSource = 'x-bookmarks' | 'x-likes' | 'x-following' | 'x-for_you'
-type XSignalSource = XEventSource | 'all' | 'low-follower'
+export type XSignalSource = XEventSource | 'all' | 'low-follower'
 type XSignalCountKey = keyof XSignalPayload['counts']
 
 type EmptyReason = 'no_data' | 'source_failure' | 'permission_denied'
@@ -59,7 +59,7 @@ type MockPayload = {
   events: MockEvent[]
 }
 
-type HotboardFeedEvent = {
+export type HotboardFeedEvent = {
   event_id: string
   source: XEventSource
   source_line: string
@@ -391,6 +391,10 @@ function loadXFeedEvents(source: XSignalSource, limit = DEFAULT_LIMIT): FeedResu
 
   if (result.events.length > 0) writeLastGoodPayload(parsed.payload)
   return result
+}
+
+export function loadHotboardFeedEvents(source: XSignalSource = 'all', limit = DEFAULT_LIMIT) {
+  return loadXFeedEvents(source, limit)
 }
 
 function loadMockPayload(): MockPayload {
