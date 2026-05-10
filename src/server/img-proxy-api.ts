@@ -145,10 +145,12 @@ function readCache(cacheDir: string, targetUrl: string, now: Date) {
     const meta = JSON.parse(fs.readFileSync(paths.metaPath, 'utf8')) as CacheMeta
     if (meta.url !== targetUrl) return null
     if (now.getTime() - Date.parse(meta.saved_at) > CACHE_TTL_MS) return null
-    if (!meta.content_type.startsWith('image/')) return null
+    if (!meta.content_type.startsWith('image/') || meta.content_type === 'image/svg+xml') return null
     const body = fs.readFileSync(paths.bodyPath)
     if (body.byteLength > MAX_IMAGE_BYTES) return null
-    return { body, contentType: meta.content_type }
+    const detectedContentType = detectBitmapContentType(body)
+    if (!detectedContentType) return null
+    return { body, contentType: detectedContentType }
   } catch {
     return null
   }
@@ -167,7 +169,30 @@ function writeCache(cacheDir: string, targetUrl: string, contentType: string, bo
   fs.writeFileSync(paths.metaPath, JSON.stringify(meta, null, 2), 'utf8')
 }
 
-function imageResponse(body: Buffer, contentType: string, cacheStatus: 'HIT' | 'MISS') {
+function imageExtension(contentType: string) {
+  if (contentType === 'image/jpeg') return 'jpg'
+  if (contentType === 'image/png') return 'png'
+  if (contentType === 'image/webp') return 'webp'
+  if (contentType === 'image/gif') return 'gif'
+  return 'bin'
+}
+
+function safeFilename(targetUrl: string, contentType: string) {
+  let filename = `image.${imageExtension(contentType)}`
+  try {
+    const basename = path.posix.basename(new URL(targetUrl).pathname)
+    if (basename && basename !== '/') filename = decodeURIComponent(basename)
+  } catch {
+    filename = `image.${imageExtension(contentType)}`
+  }
+
+  const safe = filename.replace(/[^A-Za-z0-9._-]/g, '_').replace(/^\.+/, '').slice(0, 120)
+  if (!safe) return `image.${imageExtension(contentType)}`
+  if (!safe.includes('.')) return `${safe}.${imageExtension(contentType)}`
+  return safe
+}
+
+function imageResponse(body: Buffer, contentType: string, cacheStatus: 'HIT' | 'MISS', targetUrl: string) {
   const responseBody = body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer
   return new Response(responseBody, {
     status: 200,
@@ -176,6 +201,8 @@ function imageResponse(body: Buffer, contentType: string, cacheStatus: 'HIT' | '
       'Content-Length': String(body.byteLength),
       'Cache-Control': `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`,
       'X-Img-Proxy-Cache': cacheStatus,
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': `inline; filename="${safeFilename(targetUrl, contentType)}"`,
     },
   })
 }
@@ -196,6 +223,45 @@ function contentLengthOf(response: Response) {
   if (!raw) return null
   const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function detectBitmapContentType(body: Buffer) {
+  if (body.length >= 3 && body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff) return 'image/jpeg'
+  if (body.length >= 4 && body[0] === 0x89 && body[1] === 0x50 && body[2] === 0x4e && body[3] === 0x47) return 'image/png'
+  if (body.length >= 4 && body.subarray(0, 4).toString('ascii') === 'GIF8') return 'image/gif'
+  if (
+    body.length >= 12 &&
+    body.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    body.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) return 'image/webp'
+  return null
+}
+
+async function readImageBody(response: Response) {
+  const reader = response.body?.getReader()
+  if (!reader) {
+    const arrayBuffer = await response.arrayBuffer()
+    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) return { ok: false as const, status: 413, error: 'Image exceeds 5MB limit' }
+    return { ok: true as const, body: Buffer.from(arrayBuffer) }
+  }
+
+  const chunks: Buffer[] = []
+  let totalBytes = 0
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+
+    totalBytes += value.byteLength
+    if (totalBytes > MAX_IMAGE_BYTES) {
+      await reader.cancel()
+      return { ok: false as const, status: 413, error: 'Image exceeds 5MB limit' }
+    }
+    chunks.push(Buffer.from(value))
+  }
+
+  return { ok: true as const, body: Buffer.concat(chunks, totalBytes) }
 }
 
 function isRedirectResponse(response: Response) {
@@ -249,7 +315,7 @@ export async function handleImgProxyGet(request: Request, options: ImgProxyOptio
   const cacheDir = resolveCacheDir(options.cacheDir)
   const targetUrl = validated.url.toString()
   const cached = readCache(cacheDir, targetUrl, now)
-  if (cached) return imageResponse(cached.body, cached.contentType, 'HIT')
+  if (cached) return imageResponse(cached.body, cached.contentType, 'HIT', targetUrl)
 
   const fetchImpl = options.fetchImpl ?? fetch
   const fetched = await fetchValidatedImage(validated.url, fetchImpl, options.resolveHost, 2)
@@ -260,6 +326,7 @@ export async function handleImgProxyGet(request: Request, options: ImgProxyOptio
   if (!upstream.ok) return errorResponse(502, 'Upstream image fetch failed')
 
   const contentType = contentTypeOf(upstream)
+  if (contentType === 'image/svg+xml') return errorResponse(403, 'SVG images are not allowed')
   if (!contentType.startsWith('image/')) return errorResponse(403, 'Upstream content is not an image')
 
   const contentLength = contentLengthOf(upstream)
@@ -267,12 +334,13 @@ export async function handleImgProxyGet(request: Request, options: ImgProxyOptio
     return errorResponse(413, 'Image exceeds 5MB limit')
   }
 
-  const arrayBuffer = await upstream.arrayBuffer()
-  if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
-    return errorResponse(413, 'Image exceeds 5MB limit')
-  }
+  const bodyResult = await readImageBody(upstream)
+  if (!bodyResult.ok) return errorResponse(bodyResult.status, bodyResult.error)
 
-  const body = Buffer.from(arrayBuffer)
-  writeCache(cacheDir, targetUrl, contentType, body, now)
-  return imageResponse(body, contentType, 'MISS')
+  const body = bodyResult.body
+  const detectedContentType = detectBitmapContentType(body)
+  if (!detectedContentType) return errorResponse(403, 'Upstream image magic bytes are not allowed')
+
+  writeCache(cacheDir, targetUrl, detectedContentType, body, now)
+  return imageResponse(body, detectedContentType, 'MISS', targetUrl)
 }

@@ -105,7 +105,7 @@ describe('img proxy API', () => {
 
     expect(response.status).toBe(403)
     expect(fetchImpl).toHaveBeenCalledTimes(1)
-    expect(fetchImpl.mock.calls[0]?.[1]).toMatchObject({ redirect: 'manual' })
+    expect(fetchImpl).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ redirect: 'manual' }))
   })
 
   it('rejects non-image content types', async () => {
@@ -136,6 +136,57 @@ describe('img proxy API', () => {
     expect(response.status).toBe(413)
   })
 
+  it('rejects SVG even when it is served as an image', async () => {
+    const fetchImpl = vi.fn(async () => new Response('<svg><script>alert(1)</script></svg>', {
+      headers: { 'content-type': 'image/svg+xml' },
+    }))
+    const response = await handleImgProxyGet(makeAuthedRequest('https://pbs.twimg.com/vector.svg'), {
+      fetchImpl,
+      cacheDir: tempDir,
+      resolveHost: resolvePublicHost,
+    })
+
+    expect(response.status).toBe(403)
+  })
+
+  it('rejects images larger than 5MB while streaming the body', async () => {
+    let pulls = 0
+    let canceled = false
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1
+        controller.enqueue(new Uint8Array(1024 * 1024))
+        if (pulls >= 8) controller.close()
+      },
+      cancel() {
+        canceled = true
+      },
+    })
+    const fetchImpl = vi.fn(async () => new Response(stream, { headers: { 'content-type': 'image/png' } }))
+    const response = await handleImgProxyGet(makeAuthedRequest('https://pbs.twimg.com/huge-stream.png'), {
+      fetchImpl,
+      cacheDir: tempDir,
+      resolveHost: resolvePublicHost,
+    })
+
+    expect(response.status).toBe(413)
+    expect(canceled).toBe(true)
+    expect(pulls).toBeLessThan(8)
+  })
+
+  it('rejects image responses whose magic bytes do not match allowed bitmap formats', async () => {
+    const fetchImpl = vi.fn(async () => new Response(new Uint8Array([1, 2, 3, 4, 5, 6]), {
+      headers: { 'content-type': 'image/png' },
+    }))
+    const response = await handleImgProxyGet(makeAuthedRequest('https://pbs.twimg.com/fake.png'), {
+      fetchImpl,
+      cacheDir: tempDir,
+      resolveHost: resolvePublicHost,
+    })
+
+    expect(response.status).toBe(403)
+  })
+
   it('caches valid images on disk for subsequent requests', async () => {
     const body = new Uint8Array([137, 80, 78, 71])
     const fetchImpl = vi.fn(async () => new Response(body, { headers: { 'content-type': 'image/png' } }))
@@ -149,6 +200,8 @@ describe('img proxy API', () => {
     })
     expect(first.status).toBe(200)
     expect(first.headers.get('content-type')).toBe('image/png')
+    expect(first.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(first.headers.get('content-disposition')).toBe('inline; filename="avatar.png"')
     expect(first.headers.get('x-img-proxy-cache')).toBe('MISS')
 
     const second = await handleImgProxyGet(request, {
