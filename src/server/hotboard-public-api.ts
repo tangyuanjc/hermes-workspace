@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { json } from '@tanstack/react-start'
-import { getSessionUser } from './auth-middleware'
+import { getSessionUser, isAuthenticated } from './auth-middleware'
 import { normalizeRole } from './auth-roles'
 import { loadHotboardFeedEvents, type HotboardFeedEvent } from './hotboard-feed-api'
 import { listRecentArticles, type WechatArticleRecord } from './hotboard-wechat-store'
@@ -42,18 +42,6 @@ const PUBLIC_RATE_LIMIT_WINDOW_MS = 60_000
 const PUBLIC_MAX_LIMIT = 50
 const PUBLIC_LOOKBACK_LIMIT = 500
 const TANGYUANJC_HOST_SUFFIX = '.tangyuanjc.com'
-
-const CRAWLER_UA_PATTERNS = [
-  /curl/i,
-  /wget/i,
-  /python-requests/i,
-  /scrapy/i,
-  /httpclient/i,
-  /java\//i,
-  /go-http-client/i,
-  /headlesschrome/i,
-]
-const SKILL_UA_PATTERN = /aihot-skill/i
 
 const DAILY_SECTIONS: Array<{ key: DailySectionKey; title: string }> = [
   { key: 'models', title: '模型与基础设施' },
@@ -198,8 +186,8 @@ function toPublicItem(item: InternalPublicHotboardItem, view: PublicView): Publi
 
 function corsHeaders(request: Request) {
   const headers = new Headers({
-    'Cache-Control': 'public, max-age=60',
-    Vary: 'Origin, User-Agent',
+    'Cache-Control': 'private, no-store',
+    Vary: 'Origin, Cookie',
   })
   const origin = request.headers.get('origin')
   if (!origin) return headers
@@ -225,16 +213,9 @@ function publicJson(request: Request, body: unknown, init: ResponseInit = {}) {
   return json(body, { ...init, headers })
 }
 
-function isBlockedUserAgent(request: Request) {
-  const ua = request.headers.get('user-agent') ?? ''
-  if (!ua.trim()) return false
-  if (SKILL_UA_PATTERN.test(ua)) return false
-  return CRAWLER_UA_PATTERNS.some((pattern) => pattern.test(ua))
-}
-
 function publicApiGuard(request: Request): Response | null {
-  if (isBlockedUserAgent(request)) {
-    return publicJson(request, { ok: false, error: 'Forbidden user agent' }, { status: 403 })
+  if (!isAuthenticated(request)) {
+    return publicJson(request, { ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   const limitKey = `public-api:${getClientIp(request)}`
@@ -311,4 +292,10 @@ export async function handlePublicDailiesGet(request: Request): Promise<Response
 
 export async function handlePublicOptions(request: Request): Promise<Response> {
   return new Response(null, { status: 204, headers: corsHeaders(request) })
+}
+
+export function redirectPublicToAihot(request: Request, endpoint: 'items' | 'daily' | 'dailies'): Response {
+  const url = new URL(request.url)
+  url.pathname = `/api/aihot/${endpoint}`
+  return Response.redirect(url.toString(), 308)
 }

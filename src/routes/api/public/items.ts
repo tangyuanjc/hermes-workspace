@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { handlePublicItemsGet, handlePublicOptions } from '../../../server/hotboard-public-api'
+import { handlePublicOptions, redirectPublicToAihot } from '../../../server/hotboard-public-api'
 
 export const Route = createFileRoute('/api/public/items')({
   server: {
     handlers: {
-      GET: async ({ request }) => handlePublicItemsGet(request),
+      GET: async ({ request }) => redirectPublicToAihot(request, 'items'),
       OPTIONS: async ({ request }) => handlePublicOptions(request),
     },
   },

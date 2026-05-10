@@ -113,6 +113,9 @@ import { Route as ApiHermesJobsJobIdRouteImport } from './routes/api/hermes-jobs
 import { Route as ApiAuthPasswordRouteImport } from './routes/api/auth/password'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthEmailRouteImport } from './routes/api/auth/email'
+import { Route as ApiAihotItemsRouteImport } from './routes/api/aihot/items'
+import { Route as ApiAihotDailyRouteImport } from './routes/api/aihot/daily'
+import { Route as ApiAihotDailiesRouteImport } from './routes/api/aihot/dailies'
 import { Route as AiHotboardViewLowFollowerRouteImport } from './routes/ai-hotboard/view/low-follower'
 import { Route as AiHotboardViewBookmarksRouteImport } from './routes/ai-hotboard/view/bookmarks'
 import { Route as AiHotboardViewAllRouteImport } from './routes/ai-hotboard/view/all'
@@ -650,6 +653,21 @@ const ApiAuthEmailRoute = ApiAuthEmailRouteImport.update({
   path: '/email',
   getParentRoute: () => ApiAuthRoute,
 } as any)
+const ApiAihotItemsRoute = ApiAihotItemsRouteImport.update({
+  id: '/api/aihot/items',
+  path: '/api/aihot/items',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAihotDailyRoute = ApiAihotDailyRouteImport.update({
+  id: '/api/aihot/daily',
+  path: '/api/aihot/daily',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAihotDailiesRoute = ApiAihotDailiesRouteImport.update({
+  id: '/api/aihot/dailies',
+  path: '/api/aihot/dailies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AiHotboardViewLowFollowerRoute =
   AiHotboardViewLowFollowerRouteImport.update({
     id: '/view/low-follower',
@@ -807,6 +825,9 @@ export interface FileRoutesByFullPath {
   '/ai-hotboard/view/all': typeof AiHotboardViewAllRoute
   '/ai-hotboard/view/bookmarks': typeof AiHotboardViewBookmarksRoute
   '/ai-hotboard/view/low-follower': typeof AiHotboardViewLowFollowerRoute
+  '/api/aihot/dailies': typeof ApiAihotDailiesRoute
+  '/api/aihot/daily': typeof ApiAihotDailyRoute
+  '/api/aihot/items': typeof ApiAihotItemsRoute
   '/api/auth/email': typeof ApiAuthEmailRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/password': typeof ApiAuthPasswordRoute
@@ -927,6 +948,9 @@ export interface FileRoutesByTo {
   '/ai-hotboard/view/all': typeof AiHotboardViewAllRoute
   '/ai-hotboard/view/bookmarks': typeof AiHotboardViewBookmarksRoute
   '/ai-hotboard/view/low-follower': typeof AiHotboardViewLowFollowerRoute
+  '/api/aihot/dailies': typeof ApiAihotDailiesRoute
+  '/api/aihot/daily': typeof ApiAihotDailyRoute
+  '/api/aihot/items': typeof ApiAihotItemsRoute
   '/api/auth/email': typeof ApiAuthEmailRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/password': typeof ApiAuthPasswordRoute
@@ -1050,6 +1074,9 @@ export interface FileRoutesById {
   '/ai-hotboard/view/all': typeof AiHotboardViewAllRoute
   '/ai-hotboard/view/bookmarks': typeof AiHotboardViewBookmarksRoute
   '/ai-hotboard/view/low-follower': typeof AiHotboardViewLowFollowerRoute
+  '/api/aihot/dailies': typeof ApiAihotDailiesRoute
+  '/api/aihot/daily': typeof ApiAihotDailyRoute
+  '/api/aihot/items': typeof ApiAihotItemsRoute
   '/api/auth/email': typeof ApiAuthEmailRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/password': typeof ApiAuthPasswordRoute
@@ -1174,6 +1201,9 @@ export interface FileRouteTypes {
     | '/ai-hotboard/view/all'
     | '/ai-hotboard/view/bookmarks'
     | '/ai-hotboard/view/low-follower'
+    | '/api/aihot/dailies'
+    | '/api/aihot/daily'
+    | '/api/aihot/items'
     | '/api/auth/email'
     | '/api/auth/logout'
     | '/api/auth/password'
@@ -1294,6 +1324,9 @@ export interface FileRouteTypes {
     | '/ai-hotboard/view/all'
     | '/ai-hotboard/view/bookmarks'
     | '/ai-hotboard/view/low-follower'
+    | '/api/aihot/dailies'
+    | '/api/aihot/daily'
+    | '/api/aihot/items'
     | '/api/auth/email'
     | '/api/auth/logout'
     | '/api/auth/password'
@@ -1416,6 +1449,9 @@ export interface FileRouteTypes {
     | '/ai-hotboard/view/all'
     | '/ai-hotboard/view/bookmarks'
     | '/ai-hotboard/view/low-follower'
+    | '/api/aihot/dailies'
+    | '/api/aihot/daily'
+    | '/api/aihot/items'
     | '/api/auth/email'
     | '/api/auth/logout'
     | '/api/auth/password'
@@ -1523,6 +1559,9 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
+  ApiAihotDailiesRoute: typeof ApiAihotDailiesRoute
+  ApiAihotDailyRoute: typeof ApiAihotDailyRoute
+  ApiAihotItemsRoute: typeof ApiAihotItemsRoute
   ApiHermesProxySplatRoute: typeof ApiHermesProxySplatRoute
   ApiHotboardFeedRoute: typeof ApiHotboardFeedRoute
   ApiHotboardIntakeRoute: typeof ApiHotboardIntakeRoute
@@ -2288,6 +2327,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthEmailRouteImport
       parentRoute: typeof ApiAuthRoute
     }
+    '/api/aihot/items': {
+      id: '/api/aihot/items'
+      path: '/api/aihot/items'
+      fullPath: '/api/aihot/items'
+      preLoaderRoute: typeof ApiAihotItemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/aihot/daily': {
+      id: '/api/aihot/daily'
+      path: '/api/aihot/daily'
+      fullPath: '/api/aihot/daily'
+      preLoaderRoute: typeof ApiAihotDailyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/aihot/dailies': {
+      id: '/api/aihot/dailies'
+      path: '/api/aihot/dailies'
+      fullPath: '/api/aihot/dailies'
+      preLoaderRoute: typeof ApiAihotDailiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ai-hotboard/view/low-follower': {
       id: '/ai-hotboard/view/low-follower'
       path: '/view/low-follower'
@@ -2623,6 +2683,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
+  ApiAihotDailiesRoute: ApiAihotDailiesRoute,
+  ApiAihotDailyRoute: ApiAihotDailyRoute,
+  ApiAihotItemsRoute: ApiAihotItemsRoute,
   ApiHermesProxySplatRoute: ApiHermesProxySplatRoute,
   ApiHotboardFeedRoute: ApiHotboardFeedRoute,
   ApiHotboardIntakeRoute: ApiHotboardIntakeRoute,

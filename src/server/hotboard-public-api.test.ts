@@ -101,6 +101,12 @@ function makeSession(role: 'owner' | 'member') {
   return createSessionCookie(token)
 }
 
+function makeAuthedRequest(url: string, role: 'owner' | 'member' = 'member', init: RequestInit = {}) {
+  const headers = new Headers(init.headers)
+  headers.set('cookie', makeSession(role))
+  return makeRequest(url, { ...init, headers })
+}
+
 beforeEach(() => {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hotboard-public-api-'))
   process.env.HOTBOARD_X_SIGNAL_PATH = path.join(tempDir, 'x_signal_sync_latest.json')
@@ -122,8 +128,13 @@ afterEach(() => {
 })
 
 describe('hotboard public API', () => {
-  it('returns public items for a date with simplified member fields', async () => {
-    const response = await handlePublicItemsGet(makeRequest('http://localhost/api/public/items?date=2026-05-10&limit=50'))
+  it('requires a valid session before returning items', async () => {
+    const response = await handlePublicItemsGet(makeRequest('http://localhost/api/aihot/items?date=2026-05-10&limit=50'))
+    expect(response.status).toBe(401)
+  })
+
+  it('returns public items for an authenticated member without source ids', async () => {
+    const response = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10&limit=50'))
     expect(response.status).toBe(200)
     const body = (await response.json()) as { date: string; count: number; view: string; items: Array<Record<string, unknown>> }
 
@@ -151,13 +162,19 @@ describe('hotboard public API', () => {
       'url',
     ])
     expect(body.items.some((item) => item.source === 'x-bookmarks')).toBe(false)
+    expect(body.items.some((item) => item.source === 'wechat')).toBe(false)
+    expect(body.items.some((item) => item.source === 'zara-youtube')).toBe(false)
+  })
+
+  it('marks authenticated responses as private and non-cacheable by shared caches', async () => {
+    const response = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
   })
 
   it('switches source from member source_name to owner source_id when authenticated as owner', async () => {
-    const cookie = makeSession('owner')
-    const response = await handlePublicItemsGet(makeRequest('http://localhost/api/public/items?date=2026-05-10', {
-      headers: { cookie },
-    }))
+    const response = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10', 'owner'))
     const body = (await response.json()) as { view: string; items: Array<{ source: string }> }
 
     expect(body.view).toBe('owner')
@@ -167,7 +184,7 @@ describe('hotboard public API', () => {
   })
 
   it('groups a daily brief into five sections', async () => {
-    const response = await handlePublicDailyGet(makeRequest('http://localhost/api/public/daily?date=2026-05-10'))
+    const response = await handlePublicDailyGet(makeAuthedRequest('http://localhost/api/aihot/daily?date=2026-05-10'))
     expect(response.status).toBe(200)
     const body = (await response.json()) as { sections: Array<{ key: string; count: number; items: unknown[] }> }
 
@@ -176,7 +193,7 @@ describe('hotboard public API', () => {
   })
 
   it('returns a seven day dailies list', async () => {
-    const response = await handlePublicDailiesGet(makeRequest('http://localhost/api/public/dailies'))
+    const response = await handlePublicDailiesGet(makeAuthedRequest('http://localhost/api/aihot/dailies'))
     const body = (await response.json()) as { dailies: Array<{ date: string; count: number }> }
 
     expect(body.dailies).toHaveLength(7)
@@ -184,24 +201,21 @@ describe('hotboard public API', () => {
     expect(body.dailies.some((entry) => entry.date === '2026-05-10' && entry.count === 3)).toBe(true)
   })
 
-  it('blocks default curl user agent but exempts the aihot skill agent', async () => {
-    const blocked = await handlePublicItemsGet(makeRequest('http://localhost/api/public/items?date=2026-05-10', {
+  it('does not use user agent as an access-control boundary', async () => {
+    const response = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10', 'member', {
       headers: { 'user-agent': 'curl/8.7.1' },
     }))
-    expect(blocked.status).toBe(403)
 
-    const allowed = await handlePublicItemsGet(makeRequest('http://localhost/api/public/items?date=2026-05-10', {
-      headers: { 'user-agent': 'aihot-skill/1.0' },
-    }))
-    expect(allowed.status).toBe(200)
+    expect(response.status).toBe(200)
   })
 
   it('rate limits public requests at 600 rpm plus burst with 503', async () => {
     const ip = '203.0.113.147'
     let response = new Response(null)
+    const cookie = makeSession('member')
     for (let index = 0; index < 641; index += 1) {
-      response = await handlePublicItemsGet(makeRequest('http://localhost/api/public/items?date=2026-05-10', {
-        headers: { 'x-forwarded-for': ip },
+      response = await handlePublicItemsGet(makeRequest('http://localhost/api/aihot/items?date=2026-05-10', {
+        headers: { cookie, 'x-forwarded-for': ip },
       }))
     }
 
@@ -209,12 +223,12 @@ describe('hotboard public API', () => {
   })
 
   it('sets CORS only for tangyuanjc internal domains', async () => {
-    const internal = await handlePublicItemsGet(makeRequest('http://localhost/api/public/items?date=2026-05-10', {
+    const internal = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10', 'member', {
       headers: { origin: 'https://paopao.tangyuanjc.com' },
     }))
     expect(internal.headers.get('access-control-allow-origin')).toBe('https://paopao.tangyuanjc.com')
 
-    const external = await handlePublicItemsGet(makeRequest('http://localhost/api/public/items?date=2026-05-10', {
+    const external = await handlePublicItemsGet(makeAuthedRequest('http://localhost/api/aihot/items?date=2026-05-10', 'member', {
       headers: { origin: 'https://example.com' },
     }))
     expect(external.headers.get('access-control-allow-origin')).toBeNull()
