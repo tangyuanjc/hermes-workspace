@@ -49,6 +49,7 @@ import { Route as ApiPathsRouteImport } from './routes/api/paths'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiMemoryRouteImport } from './routes/api/memory'
 import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
+import { Route as ApiImgProxyRouteImport } from './routes/api/img-proxy'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiHermesTasksAssigneesRouteImport } from './routes/api/hermes-tasks-assignees'
 import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
@@ -327,6 +328,11 @@ const ApiMemoryRoute = ApiMemoryRouteImport.update({
 const ApiLocalProvidersRoute = ApiLocalProvidersRouteImport.update({
   id: '/api/local-providers',
   path: '/api/local-providers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiImgProxyRoute = ApiImgProxyRouteImport.update({
+  id: '/api/img-proxy',
+  path: '/api/img-proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHistoryRoute = ApiHistoryRouteImport.update({
@@ -766,6 +772,7 @@ export interface FileRoutesByFullPath {
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/hermes-tasks-assignees': typeof ApiHermesTasksAssigneesRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/img-proxy': typeof ApiImgProxyRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
@@ -885,6 +892,7 @@ export interface FileRoutesByTo {
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/hermes-tasks-assignees': typeof ApiHermesTasksAssigneesRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/img-proxy': typeof ApiImgProxyRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
@@ -1007,6 +1015,7 @@ export interface FileRoutesById {
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
   '/api/hermes-tasks-assignees': typeof ApiHermesTasksAssigneesRoute
   '/api/history': typeof ApiHistoryRoute
+  '/api/img-proxy': typeof ApiImgProxyRoute
   '/api/local-providers': typeof ApiLocalProvidersRoute
   '/api/memory': typeof ApiMemoryRouteWithChildren
   '/api/models': typeof ApiModelsRoute
@@ -1130,6 +1139,7 @@ export interface FileRouteTypes {
     | '/api/hermes-tasks'
     | '/api/hermes-tasks-assignees'
     | '/api/history'
+    | '/api/img-proxy'
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
@@ -1249,6 +1259,7 @@ export interface FileRouteTypes {
     | '/api/hermes-tasks'
     | '/api/hermes-tasks-assignees'
     | '/api/history'
+    | '/api/img-proxy'
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
@@ -1370,6 +1381,7 @@ export interface FileRouteTypes {
     | '/api/hermes-tasks'
     | '/api/hermes-tasks-assignees'
     | '/api/history'
+    | '/api/img-proxy'
     | '/api/local-providers'
     | '/api/memory'
     | '/api/models'
@@ -1488,6 +1500,7 @@ export interface RootRouteChildren {
   ApiHermesTasksRoute: typeof ApiHermesTasksRouteWithChildren
   ApiHermesTasksAssigneesRoute: typeof ApiHermesTasksAssigneesRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
+  ApiImgProxyRoute: typeof ApiImgProxyRoute
   ApiLocalProvidersRoute: typeof ApiLocalProvidersRoute
   ApiMemoryRoute: typeof ApiMemoryRouteWithChildren
   ApiModelsRoute: typeof ApiModelsRoute
@@ -1825,6 +1838,13 @@ declare module '@tanstack/react-router' {
       path: '/api/local-providers'
       fullPath: '/api/local-providers'
       preLoaderRoute: typeof ApiLocalProvidersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/img-proxy': {
+      id: '/api/img-proxy'
+      path: '/api/img-proxy'
+      fullPath: '/api/img-proxy'
+      preLoaderRoute: typeof ApiImgProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/history': {
@@ -2580,6 +2600,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHermesTasksRoute: ApiHermesTasksRouteWithChildren,
   ApiHermesTasksAssigneesRoute: ApiHermesTasksAssigneesRoute,
   ApiHistoryRoute: ApiHistoryRoute,
+  ApiImgProxyRoute: ApiImgProxyRoute,
   ApiLocalProvidersRoute: ApiLocalProvidersRoute,
   ApiMemoryRoute: ApiMemoryRouteWithChildren,
   ApiModelsRoute: ApiModelsRoute,

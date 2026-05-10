@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import {
   buildFeedStats,
+  buildImgProxyUrl,
   FeedErrorBanners,
   FeedMetaBanners,
   FeedTimeline,
@@ -32,6 +33,7 @@ import {
   STRATEGY_LINES,
   WechatIngestPanel,
   writeSeenEventIds,
+  ZaraYoutubeTimeline,
   ZaraRefreshPanel,
   type TimelineEvent,
   type VoteAggregateByEvent,
@@ -254,6 +256,70 @@ describe('FeedTimeline seen state', () => {
     rerender(createElement(FeedTimeline, { ...props, showSeenEvents: true }))
     expect(screen.getByText('Seen summary')).toBeTruthy()
 
+    cleanup()
+  })
+
+  it('renders X avatars through img-proxy and falls back to a placeholder', () => {
+    const timelineGroups = [{
+      timestamp: '10:00',
+      events: [makeTimelineEvent({
+        id: 'evt-avatar',
+        avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+        source_name: 'Builder Source',
+      })],
+    }]
+
+    render(createElement(FeedTimeline, {
+      timelineGroups,
+      resolveVoteAggregate: () => voteAggregate,
+      handleVoteClick: () => {},
+      seenEventIds: new Set<string>(),
+    }))
+
+    const image = screen.getByAltText('Builder Source avatar') as HTMLImageElement
+    const proxied = new URL(image.getAttribute('src') ?? '', 'http://localhost')
+    expect(proxied.pathname).toBe('/api/img-proxy')
+    expect(atob(proxied.searchParams.get('u') ?? '')).toBe('https://pbs.twimg.com/profile_images/avatar.jpg')
+
+    fireEvent.error(image)
+    expect(screen.getByLabelText('AI')).toBeTruthy()
+    cleanup()
+  })
+})
+
+describe('image proxy UI helpers', () => {
+  it('encodes only https URLs for /api/img-proxy', () => {
+    const rawUrl = 'https://i.ytimg.com/vi/demo/hqdefault.jpg'
+    const proxied = buildImgProxyUrl(rawUrl)
+
+    expect(proxied).toBeTruthy()
+    const parsed = new URL(proxied ?? '', 'http://localhost')
+    expect(parsed.pathname).toBe('/api/img-proxy')
+    expect(atob(parsed.searchParams.get('u') ?? '')).toBe(rawUrl)
+    expect(buildImgProxyUrl('http://internal-service/avatar.png')).toBeNull()
+  })
+
+  it('renders Zara thumbnails through img-proxy and shows fallback on load failure', () => {
+    const rawUrl = 'https://i.ytimg.com/vi/7xTGNNLPyMI/hqdefault.jpg'
+    render(createElement(ZaraYoutubeTimeline, {
+      items: [{
+        videoId: '7xTGNNLPyMI',
+        url: 'https://www.youtube.com/watch?v=7xTGNNLPyMI',
+        title: 'Deep Dive into LLMs',
+        channel: 'Zara Zhang',
+        tags: ['AI'],
+        description: 'A video about LLMs',
+        thumbnailUrl: rawUrl,
+      }],
+    }))
+
+    const image = screen.getByAltText('Deep Dive into LLMs') as HTMLImageElement
+    const proxied = new URL(image.getAttribute('src') ?? '', 'http://localhost')
+    expect(proxied.pathname).toBe('/api/img-proxy')
+    expect(atob(proxied.searchParams.get('u') ?? '')).toBe(rawUrl)
+
+    fireEvent.error(image)
+    expect(screen.getByLabelText('图片加载失败')).toBeTruthy()
     cleanup()
   })
 })

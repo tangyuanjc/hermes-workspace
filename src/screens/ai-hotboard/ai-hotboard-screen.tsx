@@ -237,6 +237,21 @@ export function normalizeFeedMeta(meta?: Partial<FeedMeta>): FeedMeta {
   }
 }
 
+export function buildImgProxyUrl(rawUrl?: string | null) {
+  const trimmed = rawUrl?.trim()
+  if (!trimmed) return null
+
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'https:') return null
+  } catch {
+    return null
+  }
+
+  if (typeof globalThis.btoa !== 'function') return null
+  return `/api/img-proxy?u=${encodeURIComponent(globalThis.btoa(trimmed))}`
+}
+
 export type VoteType = 'like' | 'dislike' | 'bookmark'
 
 export type VoteAggregateEntry = {
@@ -855,6 +870,66 @@ function FriendlyEmptyState({
         </Link>
       </div>
     </section>
+  )
+}
+
+function ImagePlaceholder({
+  className,
+  label,
+  hidden = false,
+}: {
+  className: string
+  label: string
+  hidden?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center border border-white/10 bg-slate-900/78 text-xs font-medium text-slate-500',
+        className,
+      )}
+      data-testid="image-placeholder"
+      aria-label={label}
+      hidden={hidden}
+    >
+      {label}
+    </div>
+  )
+}
+
+function ProxiedImage({
+  src,
+  alt,
+  className,
+  placeholderClassName,
+  placeholderLabel = '图片加载失败',
+}: {
+  src?: string | null
+  alt: string
+  className: string
+  placeholderClassName: string
+  placeholderLabel?: string
+}) {
+  const proxiedSrc = buildImgProxyUrl(src)
+
+  if (!proxiedSrc) {
+    return <ImagePlaceholder className={placeholderClassName} label={placeholderLabel} />
+  }
+
+  return (
+    <>
+      <img
+        src={proxiedSrc}
+        alt={alt}
+        className={className}
+        onError={(event) => {
+          event.currentTarget.hidden = true
+          const placeholder = event.currentTarget.nextElementSibling
+          if (placeholder instanceof HTMLElement) placeholder.hidden = false
+        }}
+      />
+      <ImagePlaceholder className={placeholderClassName} label={placeholderLabel} hidden />
+    </>
   )
 }
 
@@ -1545,7 +1620,7 @@ export function ZaraRefreshPanel({
   )
 }
 
-function ZaraYoutubeTimeline({ items }: { items: ZaraYoutubeSummary[] }) {
+export function ZaraYoutubeTimeline({ items }: { items: ZaraYoutubeSummary[] }) {
   if (items.length === 0) {
     return (
       <FriendlyEmptyState
@@ -1567,15 +1642,12 @@ function ZaraYoutubeTimeline({ items }: { items: ZaraYoutubeSummary[] }) {
           style={HOTBOARD_CARD_STYLE}
         >
           <a href={item.url} target="_blank" rel="noreferrer" className="block">
-            {item.thumbnailUrl ? (
-              <img
-                src={item.thumbnailUrl}
-                alt={item.title}
-                className="aspect-video w-full object-cover"
-              />
-            ) : (
-              <div className="aspect-video w-full bg-slate-800" />
-            )}
+            <ProxiedImage
+              src={item.thumbnailUrl}
+              alt={item.title}
+              className="aspect-video w-full object-cover"
+              placeholderClassName="aspect-video w-full"
+            />
           </a>
           <div className="space-y-3 px-4 py-4">
             <div>
@@ -1761,7 +1833,13 @@ export function FeedTimeline({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400" style={EDITORIAL_MONO_STYLE}>
-                        <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                        <ProxiedImage
+                          src={event.avatar_url ?? event.thumbnail_url ?? event.image_url}
+                          alt={`${event.source_name} avatar`}
+                          className="h-7 w-7 rounded-full object-cover"
+                          placeholderClassName="h-7 w-7 rounded-full"
+                          placeholderLabel="AI"
+                        />
                         <span className="truncate">{event.condensedSourceLabel}</span>
                       </div>
 

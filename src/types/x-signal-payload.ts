@@ -17,6 +17,10 @@ export const X_TWEET_SCHEMA = z.object({
   replies: z.number().finite().optional(),
   created_at: z.string().optional(),
   url: z.string().optional(),
+  avatar_url: z.string().optional(),
+  profile_image_url: z.string().optional(),
+  thumbnail_url: z.string().optional(),
+  image_url: z.string().optional(),
 }).passthrough()
 
 export const X_SIGNAL_PAYLOAD_SCHEMA = z.object({

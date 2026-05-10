@@ -13,6 +13,8 @@ describe('ai hotboard feed adapter', () => {
         summary: 'A feed summary',
         signal_score: 88,
         likes: 11,
+        avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+        thumbnail_url: 'https://pbs.twimg.com/media/thumb.jpg',
         created_at: 'Wed Apr 16 12:00:00 +0000 2026',
       },
       'fallback-id',
@@ -25,6 +27,8 @@ describe('ai hotboard feed adapter', () => {
     expect(mapped.engagement.likes).toBe(11)
     expect(mapped.created_at).toContain('2026')
     expect(mapped.source_user).toBe('builder')
+    expect(mapped.avatar_url).toBe('https://pbs.twimg.com/profile_images/avatar.jpg')
+    expect(mapped.thumbnail_url).toBe('https://pbs.twimg.com/media/thumb.jpg')
   })
 
   it('does not expose an empty x source user pill value', () => {

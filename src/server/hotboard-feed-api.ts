@@ -74,6 +74,9 @@ export type HotboardFeedEvent = {
   created_at: string
   url: string
   timestamp_ms: number
+  avatar_url?: string
+  thumbnail_url?: string
+  image_url?: string
 }
 
 const SOURCE_SCHEMA = z.enum(['x-bookmarks', 'x-likes', 'x-following', 'x-for_you', 'all', 'low-follower'])
@@ -178,6 +181,30 @@ function normalizeTitle(tweet: XTweet) {
   return `${summary.slice(0, 72)}...`
 }
 
+function readStringField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
+function inferMediaImageUrl(tweet: XTweet) {
+  const media = (tweet as { media?: unknown }).media
+  if (!Array.isArray(media)) return undefined
+
+  for (const entry of media) {
+    if (!entry || typeof entry !== 'object') continue
+    const record = entry as Record<string, unknown>
+    const type = typeof record.type === 'string' ? record.type.toLowerCase() : ''
+    if (type && type !== 'photo' && !type.includes('image')) continue
+    const url = readStringField(record, ['media_url_https', 'media_url', 'url'])
+    if (url?.startsWith('https://')) return url
+  }
+
+  return undefined
+}
+
 function toHotboardEvent(
   tweet: XTweet,
   source: XEventSource,
@@ -188,6 +215,15 @@ function toHotboardEvent(
   const eventId = `${source}-${sourceUser || 'self'}-${tweetId}`
   const createdAt = (tweet.created_at ?? '').trim()
   const timestampMs = parseCreatedAt(createdAt)
+  const tweetRecord = tweet as Record<string, unknown>
+  const avatarUrl = readStringField(tweetRecord, [
+    'avatar_url',
+    'profile_image_url',
+    'profile_image_url_https',
+    'author_avatar_url',
+  ])
+  const thumbnailUrl = readStringField(tweetRecord, ['thumbnail_url', 'thumbnailUrl'])
+  const imageUrl = readStringField(tweetRecord, ['image_url', 'imageUrl']) ?? inferMediaImageUrl(tweet)
 
   return {
     event_id: eventId,
@@ -204,6 +240,9 @@ function toHotboardEvent(
     created_at: createdAt,
     url: (tweet.url ?? '').trim(),
     timestamp_ms: timestampMs,
+    avatar_url: avatarUrl,
+    thumbnail_url: thumbnailUrl,
+    image_url: imageUrl,
   }
 }
 

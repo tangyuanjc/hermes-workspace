@@ -22,6 +22,9 @@ export type MockEvent = {
   recommend_reason: string
   suggested_action: string
   source_user?: string
+  avatar_url?: string
+  thumbnail_url?: string
+  image_url?: string
 }
 
 const SUPPORTED_SOURCES: HotboardSource[] = [
@@ -55,6 +58,14 @@ export function parseGeneratedAtValue(value: string) {
   return date.getTime()
 }
 
+function optionalString(item: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = item[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
 export function mapFeedEventToMockEvent(
   item: Record<string, unknown>,
   fallbackId: string,
@@ -84,6 +95,7 @@ export function mapFeedEventToMockEvent(
       },
       recommend_reason: '推荐理由：来自公众号手工投递抓取',
       suggested_action: '更新战略：判断这篇文章是否要进入热点看板精选流',
+      thumbnail_url: optionalString(item, ['thumbnail_url', 'thumbnailUrl', 'image_url', 'imageUrl']),
     }
   }
 
@@ -115,6 +127,7 @@ export function mapFeedEventToMockEvent(
       },
       recommend_reason: '推荐理由：来自 Zara Zhang 的 AI 学习库精选视频',
       suggested_action: '更新战略：判断这条视频是否值得沉淀到 AI 热点长期知识流',
+      thumbnail_url: optionalString(item, ['thumbnailUrl', 'thumbnail_url', 'image_url', 'imageUrl']),
     }
   }
 
@@ -152,6 +165,9 @@ export function mapFeedEventToMockEvent(
     recommend_reason: '推荐理由：来自 X 实时信号同步',
     suggested_action: '触发 skill：x-signal-review（高价值信号二次判断）',
     source_user: sourceUser,
+    avatar_url: optionalString(item, ['avatar_url', 'profile_image_url', 'profile_image_url_https']),
+    thumbnail_url: optionalString(item, ['thumbnail_url', 'thumbnailUrl']),
+    image_url: optionalString(item, ['image_url', 'imageUrl']),
   }
 }
 
