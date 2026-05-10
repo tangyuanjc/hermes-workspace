@@ -9,9 +9,11 @@ import { isAuthenticated } from './auth-middleware'
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const CACHE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const STREAM_CHUNK_TIMEOUT_MS = 2_000
+const STREAM_TOTAL_TIMEOUT_MS = 10_000
 
 type ImgProxyFetch = (input: string | URL, init?: RequestInit) => Promise<Response>
-type HostResolver = (hostname: string) => Promise<string[]>
+type HostResolver = (hostname: string) => Promise<Array<string>>
 
 type ImgProxyOptions = {
   fetchImpl?: ImgProxyFetch
@@ -25,6 +27,13 @@ type CacheMeta = {
   content_type: string
   size_bytes: number
   saved_at: string
+}
+
+class ImgProxyTimeoutError extends Error {
+  constructor() {
+    super('Upstream image fetch timed out')
+    this.name = 'ImgProxyTimeoutError'
+  }
 }
 
 const ALLOWED_IMAGE_HOSTS = new Set([
@@ -103,7 +112,7 @@ function parseTargetUrl(request: Request) {
     const parsed = new URL(decoded)
     return { ok: true as const, url: parsed }
   } catch {
-    return { ok: false as const, status: 400, error: 'Invalid encoded URL' }
+    return { ok: false as const, status: 403, error: 'Invalid encoded URL' }
   }
 }
 
@@ -115,7 +124,7 @@ async function validateTargetUrl(url: URL, resolveHost?: HostResolver) {
     return { ok: false as const, status: 403, error: 'Image host is not allowed' }
   }
 
-  let addresses: string[]
+  let addresses: Array<string>
   try {
     addresses = await resolveHostAddresses(hostname, resolveHost)
   } catch {
@@ -226,6 +235,20 @@ function contentLengthOf(response: Response) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function isTimeoutError(error: unknown) {
+  if (error instanceof ImgProxyTimeoutError) return true
+  if (error instanceof Error) return error.name === 'AbortError' || error.name === 'TimeoutError'
+  return false
+}
+
+async function cancelResponseBody(response: Response) {
+  try {
+    await response.body?.cancel()
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
 function detectBitmapContentType(body: Buffer) {
   if (body.length >= 3 && body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff) return 'image/jpeg'
   if (body.length >= 4 && body[0] === 0x89 && body[1] === 0x50 && body[2] === 0x4e && body[3] === 0x47) return 'image/png'
@@ -238,31 +261,82 @@ function detectBitmapContentType(body: Buffer) {
   return null
 }
 
-async function readImageBody(response: Response) {
+async function readChunkWithTimeout(reader: ReadableStreamDefaultReader<Uint8Array>, abortController: AbortController) {
+  if (abortController.signal.aborted) throw new ImgProxyTimeoutError()
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  let abortListener: (() => void) | undefined
+
+  try {
+    return await Promise.race([
+      reader.read(),
+      new Promise<never>((_resolve, reject) => {
+        abortListener = () => reject(new ImgProxyTimeoutError())
+        abortController.signal.addEventListener('abort', abortListener, { once: true })
+        timeoutId = setTimeout(() => {
+          abortController.abort()
+          reject(new ImgProxyTimeoutError())
+        }, STREAM_CHUNK_TIMEOUT_MS)
+      }),
+    ])
+  } catch (error) {
+    if (isTimeoutError(error)) throw new ImgProxyTimeoutError()
+    throw error
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+    if (abortListener) abortController.signal.removeEventListener('abort', abortListener)
+  }
+}
+
+async function readImageBody(response: Response, abortController: AbortController) {
   const reader = response.body?.getReader()
   if (!reader) {
-    const arrayBuffer = await response.arrayBuffer()
-    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) return { ok: false as const, status: 413, error: 'Image exceeds 5MB limit' }
-    return { ok: true as const, body: Buffer.from(arrayBuffer) }
-  }
-
-  const chunks: Buffer[] = []
-  let totalBytes = 0
-
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (!value) continue
-
-    totalBytes += value.byteLength
-    if (totalBytes > MAX_IMAGE_BYTES) {
-      await reader.cancel()
-      return { ok: false as const, status: 413, error: 'Image exceeds 5MB limit' }
+    try {
+      const arrayBuffer = await response.arrayBuffer()
+      if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) return { ok: false as const, status: 413, error: 'Image exceeds 5MB limit' }
+      return { ok: true as const, body: Buffer.from(arrayBuffer) }
+    } catch (error) {
+      if (abortController.signal.aborted || isTimeoutError(error)) {
+        return { ok: false as const, status: 504, error: 'Upstream image fetch timed out' }
+      }
+      throw error
     }
-    chunks.push(Buffer.from(value))
   }
 
-  return { ok: true as const, body: Buffer.concat(chunks, totalBytes) }
+  const chunks: Array<Buffer> = []
+  let totalBytes = 0
+  let completed = false
+
+  try {
+    for (;;) {
+      const { done, value } = await readChunkWithTimeout(reader, abortController)
+      if (done) {
+        completed = true
+        break
+      }
+      totalBytes += value.byteLength
+      if (totalBytes > MAX_IMAGE_BYTES) {
+        abortController.abort()
+        return { ok: false as const, status: 413, error: 'Image exceeds 5MB limit' }
+      }
+      chunks.push(Buffer.from(value))
+    }
+
+    return { ok: true as const, body: Buffer.concat(chunks, totalBytes) }
+  } catch (error) {
+    if (abortController.signal.aborted || isTimeoutError(error)) {
+      return { ok: false as const, status: 504, error: 'Upstream image fetch timed out' }
+    }
+    throw error
+  } finally {
+    if (!completed) {
+      try {
+        await reader.cancel()
+      } catch {
+        // Best-effort cleanup only.
+      }
+    }
+  }
 }
 
 function isRedirectResponse(response: Response) {
@@ -274,33 +348,50 @@ async function fetchValidatedImage(
   fetchImpl: ImgProxyFetch,
   resolveHost: HostResolver | undefined,
   redirectsRemaining: number,
+  signal: AbortSignal,
 ): Promise<{ ok: true; response: Response } | { ok: false; status: number; error: string }> {
   const validated = await validateTargetUrl(url, resolveHost)
   if (!validated.ok) return validated
 
-  const response = await fetchImpl(validated.url, {
-    headers: {
-      Accept: 'image/*',
-      'User-Agent': 'aihot-img-proxy/1.0',
-    },
-    redirect: 'manual',
-    signal: AbortSignal.timeout(10_000),
-  })
+  let response: Response
+  try {
+    response = await fetchImpl(validated.url, {
+      headers: {
+        Accept: 'image/*',
+        'User-Agent': 'aihot-img-proxy/1.0',
+      },
+      redirect: 'manual',
+      signal,
+    })
+  } catch (error) {
+    if (signal.aborted || isTimeoutError(error)) {
+      return { ok: false, status: 504, error: 'Upstream image fetch timed out' }
+    }
+    return { ok: false, status: 502, error: 'Upstream image fetch failed' }
+  }
 
   if (!isRedirectResponse(response)) return { ok: true, response }
-  if (redirectsRemaining <= 0) return { ok: false, status: 403, error: 'Too many image redirects' }
+  if (redirectsRemaining <= 0) {
+    await cancelResponseBody(response)
+    return { ok: false, status: 403, error: 'Too many image redirects' }
+  }
 
   const location = response.headers.get('location')
-  if (!location) return { ok: false, status: 403, error: 'Image redirect is missing location' }
+  if (!location) {
+    await cancelResponseBody(response)
+    return { ok: false, status: 403, error: 'Image redirect is missing location' }
+  }
 
   let redirectedUrl: URL
   try {
     redirectedUrl = new URL(location, validated.url)
   } catch {
+    await cancelResponseBody(response)
     return { ok: false, status: 403, error: 'Image redirect location is invalid' }
   }
 
-  return fetchValidatedImage(redirectedUrl, fetchImpl, resolveHost, redirectsRemaining - 1)
+  await cancelResponseBody(response)
+  return fetchValidatedImage(redirectedUrl, fetchImpl, resolveHost, redirectsRemaining - 1, signal)
 }
 
 export async function handleImgProxyGet(request: Request, options: ImgProxyOptions = {}): Promise<Response> {
@@ -319,29 +410,50 @@ export async function handleImgProxyGet(request: Request, options: ImgProxyOptio
   if (cached) return imageResponse(cached.body, cached.contentType, 'HIT', targetUrl)
 
   const fetchImpl = options.fetchImpl ?? fetch
-  const fetched = await fetchValidatedImage(validated.url, fetchImpl, options.resolveHost, 2)
-  if (!fetched.ok) return errorResponse(fetched.status, fetched.error)
+  const abortController = new AbortController()
+  const totalTimeout = setTimeout(() => abortController.abort(), STREAM_TOTAL_TIMEOUT_MS)
 
-  const upstream = fetched.response
+  try {
+    const fetched = await fetchValidatedImage(validated.url, fetchImpl, options.resolveHost, 2, abortController.signal)
+    if (!fetched.ok) return errorResponse(fetched.status, fetched.error)
 
-  if (!upstream.ok) return errorResponse(502, 'Upstream image fetch failed')
+    const upstream = fetched.response
 
-  const contentType = contentTypeOf(upstream)
-  if (contentType === 'image/svg+xml') return errorResponse(403, 'SVG images are not allowed')
-  if (!contentType.startsWith('image/')) return errorResponse(403, 'Upstream content is not an image')
+    if (!upstream.ok) {
+      await cancelResponseBody(upstream)
+      if (upstream.status >= 400 && upstream.status < 500) return errorResponse(upstream.status, 'Upstream image fetch failed')
+      return errorResponse(502, 'Upstream image fetch failed')
+    }
 
-  const contentLength = contentLengthOf(upstream)
-  if (contentLength !== null && contentLength > MAX_IMAGE_BYTES) {
-    return errorResponse(413, 'Image exceeds 5MB limit')
+    const contentType = contentTypeOf(upstream)
+    if (contentType === 'image/svg+xml') {
+      abortController.abort()
+      await cancelResponseBody(upstream)
+      return errorResponse(403, 'SVG images are not allowed')
+    }
+    if (!contentType.startsWith('image/')) {
+      abortController.abort()
+      await cancelResponseBody(upstream)
+      return errorResponse(403, 'Upstream content is not an image')
+    }
+
+    const contentLength = contentLengthOf(upstream)
+    if (contentLength !== null && contentLength > MAX_IMAGE_BYTES) {
+      abortController.abort()
+      await cancelResponseBody(upstream)
+      return errorResponse(413, 'Image exceeds 5MB limit')
+    }
+
+    const bodyResult = await readImageBody(upstream, abortController)
+    if (!bodyResult.ok) return errorResponse(bodyResult.status, bodyResult.error)
+
+    const body = bodyResult.body
+    const detectedContentType = detectBitmapContentType(body)
+    if (!detectedContentType) return errorResponse(403, 'Upstream image magic bytes are not allowed')
+
+    writeCache(cacheDir, targetUrl, detectedContentType, body, now)
+    return imageResponse(body, detectedContentType, 'MISS', targetUrl)
+  } finally {
+    clearTimeout(totalTimeout)
   }
-
-  const bodyResult = await readImageBody(upstream)
-  if (!bodyResult.ok) return errorResponse(bodyResult.status, bodyResult.error)
-
-  const body = bodyResult.body
-  const detectedContentType = detectBitmapContentType(body)
-  if (!detectedContentType) return errorResponse(403, 'Upstream image magic bytes are not allowed')
-
-  writeCache(cacheDir, targetUrl, detectedContentType, body, now)
-  return imageResponse(body, detectedContentType, 'MISS', targetUrl)
 }

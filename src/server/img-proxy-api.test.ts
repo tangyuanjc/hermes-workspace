@@ -121,12 +121,19 @@ describe('img proxy API', () => {
   })
 
   it('rejects images larger than 5MB by content length', async () => {
-    const fetchImpl = vi.fn(async () => new Response(new Uint8Array([1]), {
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array([1]))
+      },
+    })
+    const upstream = new Response(stream, {
       headers: {
         'content-type': 'image/png',
         'content-length': String(5 * 1024 * 1024 + 1),
       },
-    }))
+    })
+    const getReader = vi.spyOn(upstream.body!, 'getReader')
+    const fetchImpl = vi.fn(async () => upstream)
     const response = await handleImgProxyGet(makeAuthedRequest('https://pbs.twimg.com/huge.png'), {
       fetchImpl,
       cacheDir: tempDir,
@@ -134,6 +141,29 @@ describe('img proxy API', () => {
     })
 
     expect(response.status).toBe(413)
+    expect(getReader).not.toHaveBeenCalled()
+  })
+
+  it('passes through upstream 4xx and maps upstream 5xx to bad gateway', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL) => {
+      const url = input.toString()
+      if (url.includes('missing')) return new Response('not found', { status: 404 })
+      return new Response('unavailable', { status: 503 })
+    })
+
+    const missing = await handleImgProxyGet(makeAuthedRequest('https://pbs.twimg.com/missing.png'), {
+      fetchImpl,
+      cacheDir: tempDir,
+      resolveHost: resolvePublicHost,
+    })
+    const unavailable = await handleImgProxyGet(makeAuthedRequest('https://pbs.twimg.com/unavailable.png'), {
+      fetchImpl,
+      cacheDir: tempDir,
+      resolveHost: resolvePublicHost,
+    })
+
+    expect(missing.status).toBe(404)
+    expect(unavailable.status).toBe(502)
   })
 
   it('rejects SVG even when it is served as an image', async () => {
@@ -172,6 +202,45 @@ describe('img proxy API', () => {
     expect(response.status).toBe(413)
     expect(canceled).toBe(true)
     expect(pulls).toBeLessThan(8)
+  })
+
+  it('times out and cancels slow streaming image responses', async () => {
+    vi.useFakeTimers()
+    let canceled = false
+    let fetchSignal: AbortSignal | undefined
+    let chunks = 0
+    const stream = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        chunks += 1
+        controller.enqueue(chunks === 1 ? new Uint8Array([137, 80, 78, 71]) : new Uint8Array([0]))
+        if (chunks >= 12) controller.close()
+      },
+      cancel() {
+        canceled = true
+      },
+    })
+    const fetchImpl = vi.fn(async (_input: string | URL, init?: RequestInit) => {
+      fetchSignal = init?.signal as AbortSignal | undefined
+      return new Response(stream, { headers: { 'content-type': 'image/png' } })
+    })
+
+    try {
+      const responsePromise = handleImgProxyGet(makeAuthedRequest('https://pbs.twimg.com/slow-stream.png'), {
+        fetchImpl,
+        cacheDir: tempDir,
+        resolveHost: resolvePublicHost,
+      })
+
+      await vi.advanceTimersByTimeAsync(12_000)
+      const response = await responsePromise
+
+      expect(response.status).toBe(504)
+      expect(canceled).toBe(true)
+      expect(fetchSignal?.aborted).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('rejects image responses whose magic bytes do not match allowed bitmap formats', async () => {
