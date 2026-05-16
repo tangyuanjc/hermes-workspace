@@ -10,7 +10,7 @@
     "dev": "node scripts/dev-with-hotboard-bootstrap.mjs",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
-    "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node .output/server/index.mjs",
+    "start": "NODE_OPTIONS=\"--max-old-space-size=2048\" node server-entry.js",
     "start:dev": "node scripts/dev-with-hotboard-bootstrap.mjs",
     "preview": "vite preview",
     "test": "vitest run",
