@@ -1,0 +1,21 @@
+# Deploy to /etc/systemd/system/ai-hotboard.service on the VPS.
+
+[Unit]
+Description=AI Hotboard production server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ai-hotboard/hermes-workspace
+EnvironmentFile=-/etc/default/ai-hotboard
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

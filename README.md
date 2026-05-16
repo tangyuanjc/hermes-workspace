@@ -271,6 +271,26 @@ sudo systemctl reload nginx
 The `/assets/` location is intentionally separate from app routes so hashed Vite
 assets can use `Cache-Control: public, max-age=31536000, immutable`.
 
+Build and run the production server through systemd:
+
+```bash
+cd /opt/ai-hotboard/hermes-workspace
+npm ci
+NODE_OPTIONS="--max-old-space-size=2048" npm run build
+test -f dist/server/server.js
+
+sudo cp launchd/ai-hotboard-vps.service /etc/systemd/system/ai-hotboard.service
+sudo systemd-analyze verify /etc/systemd/system/ai-hotboard.service
+sudo systemctl daemon-reload
+sudo systemctl enable ai-hotboard
+sudo systemctl restart ai-hotboard
+sleep 5
+curl -sI http://localhost:3000/ai-hotboard
+```
+
+The unit uses `ExecStart=/usr/bin/npm start`, so it serves the built Vite SSR
+output through `server-entry.js` instead of running Vite dev mode.
+
 ---
 
 ## 📱 Install as App (Recommended)
