@@ -256,6 +256,23 @@ Open `http://localhost:3000` and complete the onboarding.
 
 ---
 
+## VPS Production Deployment
+
+The ai-hotboard VPS uses Nginx in front of the Node production server. Deploy
+the Nginx site template from `launchd/nginx-ai-hotboard.conf` to the VPS path:
+
+```bash
+sudo cp launchd/nginx-ai-hotboard.conf /etc/nginx/sites-available/ai-hotboard
+sudo ln -sf /etc/nginx/sites-available/ai-hotboard /etc/nginx/sites-enabled/ai-hotboard
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+The `/assets/` location is intentionally separate from app routes so hashed Vite
+assets can use `Cache-Control: public, max-age=31536000, immutable`.
+
+---
+
 ## 📱 Install as App (Recommended)
 
 Hermes Workspace is a **Progressive Web App (PWA)** — install it for the full native app experience with no browser chrome, keyboard shortcuts, and offline support.
