@@ -1,4 +1,6 @@
 # Deploy to /etc/systemd/system/ai-hotboard.service on the VPS.
+# 注意: PASSWORD env vars 必须在 EnvironmentFile (path 默认 /etc/ai-hotboard.env, 跟 5/15 部署对齐).
+# 部署前确保 /etc/ai-hotboard.env 存在 + chmod 600 + 含 PASSWORD_JC ~ PASSWORD_XINXIN 8 个密码.
 
 [Unit]
 Description=AI Hotboard production server
@@ -7,15 +9,26 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=root
 WorkingDirectory=/opt/ai-hotboard/hermes-workspace
-EnvironmentFile=-/etc/default/ai-hotboard
+# EnvironmentFile 路径跟 5/15 VPS 部署对齐 (CSO 5/15 配 /etc/ai-hotboard.env), 不用 /etc/default/* 避免 deploy convention mismatch
+EnvironmentFile=/etc/ai-hotboard.env
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=3000
+Environment=HOME=/var/lib/ai-hotboard
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/npm start
-Restart=always
+Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
+StandardOutput=append:/var/log/ai-hotboard.out.log
+StandardError=append:/var/log/ai-hotboard.err.log
+LimitNOFILE=65536
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
