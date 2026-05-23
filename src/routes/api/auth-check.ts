@@ -7,39 +7,45 @@ import {
   isFeishuSsoEnabled,
   isPasswordProtectionEnabled,
 } from '../../server/auth-middleware'
-import { ensureGatewayProbed } from '../../server/gateway-capabilities'
+import {
+  ensureGatewayProbed,
+  getCapabilities,
+} from '../../server/gateway-capabilities'
+
+function refreshGatewayMetadataInBackground() {
+  void Promise.resolve(ensureGatewayProbed()).catch(() => {
+    // Gateway availability is optional metadata for auth-check.
+  })
+}
 
 export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        // Gateway probe is best-effort metadata, NOT auth gating.
-        // ai-hotboard auth uses local SQLite session store independent of
-        // hermes-agent HTTP gateway. If gateway is down, login still works.
-        let hermesGatewayReachable = false
-        try {
-          const caps = await ensureGatewayProbed()
-          hermesGatewayReachable =
-            caps.health || caps.chatCompletions || caps.models
-        } catch {
-          hermesGatewayReachable = false
+        const caps = getCapabilities()
+        const hermesGatewayReachable =
+          caps.health || caps.chatCompletions || caps.models
+        if (!caps.probed) {
+          refreshGatewayMetadataInBackground()
         }
 
         const authRequired =
           isPasswordProtectionEnabled() ||
           isFeishuSsoEnabled() ||
           isEmailAuthEnabled()
-        const session = isAuthenticated(request) ? getSessionWithUser(request) : null
+        const session = isAuthenticated(request)
+          ? getSessionWithUser(request)
+          : null
         const authenticated = session !== null
         const user = session?.user ?? null
 
         const authMode = isEmailAuthEnabled()
           ? 'email_magic_link'
           : isFeishuSsoEnabled()
-          ? 'feishu_sso'
-          : authRequired
-          ? 'password'
-          : 'none'
+            ? 'feishu_sso'
+            : authRequired
+              ? 'password'
+              : 'none'
 
         return json({
           authenticated,
