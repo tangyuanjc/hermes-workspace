@@ -27,7 +27,17 @@ export function getPasswordWhitelist(): ReadonlyArray<PasswordUserRecord> {
   return PASSWORD_WHITELIST
 }
 
-export function resolvePasswordUser(username: string): PasswordUserRecord | null {
+export function isPasswordAuthConfigured(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return PASSWORD_WHITELIST.some((user) =>
+    Boolean(env[envKeyFor(user)]?.trim()),
+  )
+}
+
+export function resolvePasswordUser(
+  username: string,
+): PasswordUserRecord | null {
   const normalized = username.trim().toLowerCase()
   if (!normalized) return null
   return PASSWORD_WHITELIST.find((u) => u.username === normalized) ?? null
@@ -72,7 +82,10 @@ function timingSafeStringEqual(a: string, b: string): boolean {
 
 export type PasswordAuthResult =
   | { ok: true; user: PasswordUserRecord; source: 'env' | 'dev-fallback' }
-  | { ok: false; reason: 'unknown_user' | 'no_password_configured' | 'wrong_password' }
+  | {
+      ok: false
+      reason: 'unknown_user' | 'no_password_configured' | 'wrong_password'
+    }
 
 export function authenticatePassword(
   username: string,

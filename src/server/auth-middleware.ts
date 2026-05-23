@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
+import { isPasswordAuthConfigured } from './password-auth'
 
 const SESSION_COOKIE_NAME = 'hermes-auth'
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -354,8 +355,10 @@ export function revokeSessionToken(token: string): void {
  * Check if password protection is enabled.
  */
 export function isPasswordProtectionEnabled(): boolean {
-  return Boolean(
-    process.env.HERMES_PASSWORD && process.env.HERMES_PASSWORD.length > 0,
+  return (
+    Boolean(
+      process.env.HERMES_PASSWORD && process.env.HERMES_PASSWORD.length > 0,
+    ) || isPasswordAuthConfigured()
   )
 }
 

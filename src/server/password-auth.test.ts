@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   authenticatePassword,
   getPasswordWhitelist,
+  isPasswordAuthConfigured,
   passwordUserToUpsertInput,
   readExpectedPassword,
   resolvePasswordUser,
@@ -21,9 +22,20 @@ describe('resolvePasswordUser', () => {
   })
 
   it('covers the full 8-person pilot whitelist', () => {
-    const usernames = getPasswordWhitelist().map((u) => u.username).sort()
+    const usernames = getPasswordWhitelist()
+      .map((u) => u.username)
+      .sort()
     expect(usernames).toEqual(
-      ['fangfang', 'huangning', 'jc', 'naisi', 'paopao', 'pipi', 'xiaolong', 'xinxin'].sort(),
+      [
+        'fangfang',
+        'huangning',
+        'jc',
+        'naisi',
+        'paopao',
+        'pipi',
+        'xiaolong',
+        'xinxin',
+      ].sort(),
     )
   })
 })
@@ -47,9 +59,24 @@ describe('readExpectedPassword', () => {
   })
 })
 
+describe('isPasswordAuthConfigured', () => {
+  it('detects PASSWORD_* env configuration for the pilot whitelist', () => {
+    expect(isPasswordAuthConfigured({ PASSWORD_JC: 'secret-abc' })).toBe(true)
+    expect(
+      isPasswordAuthConfigured({ PASSWORD_PAOPAO: '  paopao-secret  ' }),
+    ).toBe(true)
+    expect(isPasswordAuthConfigured({ HERMES_PASSWORD: 'legacy-only' })).toBe(
+      false,
+    )
+    expect(isPasswordAuthConfigured({ PASSWORD_JC: '   ' })).toBe(false)
+  })
+})
+
 describe('authenticatePassword', () => {
   it('succeeds for matching env-configured password', () => {
-    const result = authenticatePassword('jc', 'secret-abc', { PASSWORD_JC: 'secret-abc' })
+    const result = authenticatePassword('jc', 'secret-abc', {
+      PASSWORD_JC: 'secret-abc',
+    })
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.user.username).toBe('jc')
@@ -58,8 +85,12 @@ describe('authenticatePassword', () => {
   })
 
   it('rejects wrong password without leaking which account exists', () => {
-    const r1 = authenticatePassword('jc', 'not-the-password', { PASSWORD_JC: 'secret-abc' })
-    const r2 = authenticatePassword('nobody-like-this', 'anything', { PASSWORD_JC: 'secret-abc' })
+    const r1 = authenticatePassword('jc', 'not-the-password', {
+      PASSWORD_JC: 'secret-abc',
+    })
+    const r2 = authenticatePassword('nobody-like-this', 'anything', {
+      PASSWORD_JC: 'secret-abc',
+    })
     expect(r1.ok).toBe(false)
     expect(r2.ok).toBe(false)
     if (!r1.ok) expect(r1.reason).toBe('wrong_password')
@@ -73,7 +104,9 @@ describe('authenticatePassword', () => {
   })
 
   it('dev-mode fallback: username doubles as password', () => {
-    const result = authenticatePassword('paopao', 'paopao', { NODE_ENV: 'development' })
+    const result = authenticatePassword('paopao', 'paopao', {
+      NODE_ENV: 'development',
+    })
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.source).toBe('dev-fallback')
   })
