@@ -34,20 +34,20 @@
 
 ## 📸 Screenshots
 
-|                 Chat                 |                  Conductor                   |
-| :----------------------------------: | :------------------------------------------: |
+|                 Chat                 |                   Conductor                    |
+| :----------------------------------: | :--------------------------------------------: |
 | ![Chat](./docs/screenshots/chat.png) | ![Conductor](./docs/screenshots/conductor.png) |
 
-|                   Dashboard                  |                  Memory                  |
-| :------------------------------------------: | :--------------------------------------: |
+|                   Dashboard                    |                  Memory                  |
+| :--------------------------------------------: | :--------------------------------------: |
 | ![Dashboard](./docs/screenshots/dashboard.png) | ![Memory](./docs/screenshots/memory.png) |
 
 |                   Terminal                   |                   Settings                   |
 | :------------------------------------------: | :------------------------------------------: |
 | ![Terminal](./docs/screenshots/terminal.png) | ![Settings](./docs/screenshots/settings.png) |
 
-|                  Tasks                  |                 Jobs                 |
-| :--------------------------------------: | :----------------------------------: |
+|                 Tasks                  |                 Jobs                 |
+| :------------------------------------: | :----------------------------------: |
 | ![Tasks](./docs/screenshots/tasks.png) | ![Jobs](./docs/screenshots/jobs.png) |
 
 ---
@@ -290,6 +290,14 @@ curl -sI http://localhost:3000/ai-hotboard
 
 The unit uses `ExecStart=/usr/bin/npm start`, so it serves the built Vite SSR
 output through `server-entry.js` instead of running Vite dev mode.
+
+Password login is self-contained on the VPS. The production unit loads the
+`PASSWORD_<USERNAME>` variables from `/etc/ai-hotboard.env` and stores sessions
+in local SQLite at `$HOME/.hermes/data/auth.sqlite`; it does not require Hermes
+Gateway to create or validate web sessions. A missing Gateway on the VPS is
+expected for ai-hotboard-only deployment: `/api/auth/password` and
+`/api/auth-check` should still return normally, while `/api/connection-status`
+and `/api/gateway-status` report disconnected Gateway metadata.
 
 ---
 

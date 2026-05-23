@@ -29,6 +29,19 @@
 - Feishu IM uses `lark-cli im +messages-send --as bot`; the default recipient is `ou_a06ae3d7885f83839917ac0f44e46247`, JC's open_id for this `lark-cli` app.
 - Override the recipient without editing credentials: `AIHOTBOARD_ALERT_USER_ID=<open_id> scripts/monitor-aihotboard.sh`.
 
+## VPS auth and Gateway split
+
+- ai-hotboard web auth is local to the VPS. Password login reads
+  `PASSWORD_<USERNAME>` values from `/etc/ai-hotboard.env` and writes web
+  sessions to `$HOME/.hermes/data/auth.sqlite`.
+- Hermes Gateway is not required for ai-hotboard auth. On the VPS, Gateway
+  unavailable is expected unless chat/enhanced Hermes features are intentionally
+  deployed there too.
+- `/api/auth-check` must stay fast and local-first. Gateway reachability is only
+  optional metadata in its JSON response.
+- `/api/connection-status` and `/api/gateway-status` should degrade to
+  disconnected metadata instead of returning 500 when Gateway probing fails.
+
 ## Manual operations
 
 Install or refresh launchd jobs:

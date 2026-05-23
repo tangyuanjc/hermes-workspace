@@ -17,7 +17,12 @@ export const Route = createFileRoute('/api/gateway-status')({
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const capabilities = await ensureGatewayProbed()
+        let capabilities = getCapabilities()
+        try {
+          capabilities = await ensureGatewayProbed()
+        } catch {
+          capabilities = getCapabilities()
+        }
         return json({
           capabilities,
           mode: getGatewayMode(),

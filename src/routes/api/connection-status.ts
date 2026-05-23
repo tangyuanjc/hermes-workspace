@@ -10,7 +10,9 @@ import YAML from 'yaml'
 import {
   HERMES_API,
   ensureGatewayProbed,
+  getCapabilities,
   getChatMode,
+  type GatewayCapabilities,
 } from '../../server/gateway-capabilities'
 import { isAuthenticated } from '../../server/auth-middleware'
 
@@ -30,6 +32,14 @@ function readActiveModel(): string {
     // config missing or unreadable
   }
   return ''
+}
+
+async function readGatewayCapabilities(): Promise<GatewayCapabilities> {
+  try {
+    return await ensureGatewayProbed()
+  } catch {
+    return getCapabilities()
+  }
 }
 
 type ConnectionStatus = {
@@ -52,7 +62,7 @@ export const Route = createFileRoute('/api/connection-status')({
         const authResult = isAuthenticated(request)
         if (authResult !== true) return authResult as unknown as Response
 
-        const caps = await ensureGatewayProbed()
+        const caps = await readGatewayCapabilities()
         const activeModel = readActiveModel()
         const modelConfigured = Boolean(activeModel)
 
