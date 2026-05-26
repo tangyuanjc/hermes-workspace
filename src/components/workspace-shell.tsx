@@ -58,6 +58,22 @@ export function isFullscreenExperienceRoute(pathname: string): boolean {
   return pathname.startsWith('/ai-hotboard')
 }
 
+export function shouldSuppressWorkspaceOverlays(pathname: string): boolean {
+  return pathname === '/dashboard' || isFullscreenExperienceRoute(pathname)
+}
+
+export function shouldLoadWorkspaceData({
+  authChecked,
+  authenticated,
+  fullscreenExperience,
+}: {
+  authChecked: boolean
+  authenticated: boolean
+  fullscreenExperience: boolean
+}): boolean {
+  return authChecked && authenticated && !fullscreenExperience
+}
+
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -148,10 +164,16 @@ export function WorkspaceShell() {
   const isOnChatRoute = Boolean(chatMatch) || pathname === '/new'
   const isOnTerminalRoute = pathname.startsWith('/terminal')
   const isOnFullscreenExperience = isFullscreenExperienceRoute(pathname)
-  const suppressFirstOpenOverlays = pathname === '/dashboard'
-  const hideChatSidebar = isOnChatRoute && chatFocusMode
+  const suppressFirstOpenOverlays = shouldSuppressWorkspaceOverlays(pathname)
+  const loadWorkspaceData = shouldLoadWorkspaceData({
+    authChecked: authState.checked,
+    authenticated: authState.authenticated,
+    fullscreenExperience: isOnFullscreenExperience,
+  })
+  const hideChatSidebar =
+    (isOnChatRoute && chatFocusMode) || isOnFullscreenExperience
   const showDesktopSidebarBackdrop =
-    !isMobile && !isOnChatRoute && !sidebarCollapsed
+    !isMobile && !isOnChatRoute && !isOnFullscreenExperience && !sidebarCollapsed
 
   // Sessions query — shared across sidebar and chat
   const sessionsQuery = useQuery({
@@ -159,6 +181,7 @@ export function WorkspaceShell() {
     queryFn: fetchSessions,
     refetchInterval: 15_000,
     staleTime: 10_000,
+    enabled: loadWorkspaceData,
   })
 
   const sessions = sessionsQuery.data ?? []
@@ -171,8 +194,9 @@ export function WorkspaceShell() {
     : null
 
   const refetchSessions = useCallback(() => {
+    if (!loadWorkspaceData) return
     void sessionsQuery.refetch()
-  }, [sessionsQuery])
+  }, [loadWorkspaceData, sessionsQuery])
 
   const startNewChat = useCallback(() => {
     setCreatingSession(true)
@@ -268,7 +292,7 @@ export function WorkspaceShell() {
         className="relative overflow-hidden theme-bg theme-text"
         style={shellStyle}
       >
-        <HermesReconnectBanner enabled={authState.checked} />
+        <HermesReconnectBanner enabled={loadWorkspaceData} />
         {/* Electron: native-style title bar (absolute over the padding) */}
         {isElectron && (
           <div

@@ -5,7 +5,10 @@ import appCss from '../styles.css?url'
 import { SearchModal } from '@/components/search/search-modal'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
-import { WorkspaceShell } from '@/components/workspace-shell'
+import {
+  WorkspaceShell,
+  shouldSuppressWorkspaceOverlays,
+} from '@/components/workspace-shell'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
 import { Toaster } from '@/components/ui/toast'
 import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
@@ -255,8 +258,7 @@ function RootLayout() {
   // their own full-screen experience (dashboard landing, ai-hotboard). The
   // react-joyride overlay was silently intercepting clicks on the ai-hotboard
   // left-rail for first-time visitors — hence "nav 点不动" for new users.
-  const suppressFirstOpenOverlays =
-    pathname === '/dashboard' || pathname.startsWith('/ai-hotboard')
+  const suppressFirstOpenOverlays = shouldSuppressWorkspaceOverlays(pathname)
 
   // Unregister any existing service workers — they cause stale asset issues
   // after Docker image updates and behind reverse proxies (Pangolin, Cloudflare, etc.)
