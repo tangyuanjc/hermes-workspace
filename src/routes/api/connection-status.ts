@@ -10,7 +10,6 @@ import YAML from 'yaml'
 import {
   HERMES_API,
   ensureGatewayProbed,
-  getCapabilities,
   getChatMode,
   type GatewayCapabilities,
 } from '../../server/gateway-capabilities'
@@ -35,11 +34,29 @@ function readActiveModel(): string {
 }
 
 async function readGatewayCapabilities(): Promise<GatewayCapabilities> {
-  try {
-    return await ensureGatewayProbed()
-  } catch {
-    return getCapabilities()
-  }
+  return await ensureGatewayProbed()
+}
+
+function unauthorizedResponse(): Response {
+  return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+}
+
+function getGatewayErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'gateway probe failed'
+}
+
+function gatewayUnavailableResponse(error: unknown): Response {
+  return Response.json(
+    {
+      ok: false,
+      reason: 'gateway_unavailable',
+      gatewayError: getGatewayErrorMessage(error),
+      status: 'disconnected',
+      disconnected: true,
+      gatewayReachable: false,
+    },
+    { status: 503 },
+  )
 }
 
 type ConnectionStatus = {
@@ -62,9 +79,14 @@ export const Route = createFileRoute('/api/connection-status')({
     handlers: {
       GET: async ({ request }) => {
         const authResult = isAuthenticated(request)
-        if (authResult !== true) return authResult as unknown as Response
+        if (authResult !== true) return unauthorizedResponse()
 
-        const caps = await readGatewayCapabilities()
+        let caps: GatewayCapabilities
+        try {
+          caps = await readGatewayCapabilities()
+        } catch (error) {
+          return gatewayUnavailableResponse(error)
+        }
         const activeModel = readActiveModel()
         const modelConfigured = Boolean(activeModel)
 

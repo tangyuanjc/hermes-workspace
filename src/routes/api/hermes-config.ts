@@ -10,7 +10,6 @@ import YAML from 'yaml'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
   ensureGatewayProbed,
-  getCapabilities,
   type GatewayCapabilities,
 } from '../../server/gateway-capabilities'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
@@ -179,6 +178,28 @@ function getGatewayErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'gateway probe failed'
 }
 
+function unauthorizedResponse(): Response {
+  return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+}
+
+function gatewayUnavailableResponse(error: unknown): Response {
+  return Response.json(
+    {
+      ok: false,
+      reason: 'gateway_unavailable',
+      gatewayError: getGatewayErrorMessage(error),
+      config: {},
+      providers: [],
+      activeProvider: '',
+      activeModel: '',
+      hermesHome: HERMES_HOME,
+      disconnected: true,
+      gatewayReachable: false,
+    },
+    { status: 503 },
+  )
+}
+
 function isGatewayReachable(capabilities: GatewayCapabilities): boolean {
   return (
     capabilities.health ||
@@ -191,14 +212,7 @@ async function readConfigCapabilityState(): Promise<{
   capabilities: GatewayCapabilities
   gatewayError?: string
 }> {
-  try {
-    return { capabilities: await ensureGatewayProbed() }
-  } catch (error) {
-    return {
-      capabilities: getCapabilities(),
-      gatewayError: getGatewayErrorMessage(error),
-    }
-  }
+  return { capabilities: await ensureGatewayProbed() }
 }
 
 function createConfigUnavailableBody(
@@ -224,8 +238,16 @@ export const Route = createFileRoute('/api/hermes-config')({
     handlers: {
       GET: async ({ request }) => {
         const authResult = isAuthenticated(request) as AuthResult
-        if (authResult !== true) return authResult
-        const gatewayState = await readConfigCapabilityState()
+        if (authResult !== true) return unauthorizedResponse()
+        let gatewayState: {
+          capabilities: GatewayCapabilities
+          gatewayError?: string
+        }
+        try {
+          gatewayState = await readConfigCapabilityState()
+        } catch (error) {
+          return gatewayUnavailableResponse(error)
+        }
         if (!gatewayState.capabilities.config) {
           return Response.json(createConfigUnavailableBody(gatewayState))
         }
@@ -286,8 +308,16 @@ export const Route = createFileRoute('/api/hermes-config')({
 
       PATCH: async ({ request }) => {
         const authResult = isAuthenticated(request) as AuthResult
-        if (authResult !== true) return authResult
-        const gatewayState = await readConfigCapabilityState()
+        if (authResult !== true) return unauthorizedResponse()
+        let gatewayState: {
+          capabilities: GatewayCapabilities
+          gatewayError?: string
+        }
+        try {
+          gatewayState = await readConfigCapabilityState()
+        } catch (error) {
+          return gatewayUnavailableResponse(error)
+        }
         if (!gatewayState.capabilities.config) {
           return new Response(
             JSON.stringify(

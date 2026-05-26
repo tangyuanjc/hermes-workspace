@@ -107,7 +107,7 @@ afterEach(() => {
   }
 })
 
-function setupTempAuth() {
+function setupPasswordAuthRequired() {
   const tempDir = fs.mkdtempSync(
     path.join(os.tmpdir(), 'hermes-gateway-status-'),
   )
@@ -118,7 +118,10 @@ function setupTempAuth() {
   delete process.env.HERMES_PASSWORD
   delete process.env.FEISHU_APP_ID
   delete process.env.FEISHU_APP_SECRET
+}
 
+function setupTempAuth() {
+  setupPasswordAuthRequired()
   const store = createSessionStore()
   store.upsertUser({
     feishuOpenId: 'pwd:jc',
@@ -132,6 +135,15 @@ function setupTempAuth() {
   return createSessionCookie('local-token')
 }
 
+function unauthenticatedRequest(url: string) {
+  setupPasswordAuthRequired()
+  return new Request(url, {
+    headers: {
+      'x-forwarded-for': '203.0.113.10',
+    },
+  })
+}
+
 function authedRequest(url: string) {
   return new Request(url, {
     headers: {
@@ -142,24 +154,53 @@ function authedRequest(url: string) {
 }
 
 describe('gateway status endpoints without Hermes Gateway', () => {
-  it('connection-status degrades instead of throwing when gateway probing fails', async () => {
+  it('connection-status rejects unauthenticated requests with HTTP 401', async () => {
+    const response = await connectionStatusHandlers.GET({
+      request: unauthenticatedRequest('http://localhost/api/connection-status'),
+    })
+
+    expect(response).toBeInstanceOf(Response)
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Unauthorized',
+    })
+    expect(gatewayMock.ensureGatewayProbed).not.toHaveBeenCalled()
+  })
+
+  it('hermes-config rejects unauthenticated requests with HTTP 401', async () => {
+    const response = await hermesConfigHandlers.GET({
+      request: unauthenticatedRequest('http://localhost/api/hermes-config'),
+    })
+
+    expect(response).toBeInstanceOf(Response)
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Unauthorized',
+    })
+    expect(gatewayMock.ensureGatewayProbed).not.toHaveBeenCalled()
+  })
+
+  it('connection-status returns 503 degraded JSON when gateway probing fails', async () => {
     gatewayMock.ensureGatewayProbed.mockRejectedValue(new Error('gateway down'))
 
     const response = await connectionStatusHandlers.GET({
       request: authedRequest('http://localhost/api/connection-status'),
     })
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(503)
     const body = (await response.json()) as {
-      status: string
-      chatReady: boolean
+      ok: boolean
+      reason: string
+      gatewayError: string
     }
     expect(body).toMatchObject({
-      status: 'disconnected',
-      disconnected: true,
-      gatewayReachable: false,
-      chatReady: false,
+      ok: false,
+      reason: 'gateway_unavailable',
+      gatewayError: 'gateway down',
     })
+    expect(body).not.toHaveProperty('unhandled')
   })
 
   it('gateway-status returns disconnected metadata when gateway probing fails', async () => {
@@ -183,32 +224,24 @@ describe('gateway status endpoints without Hermes Gateway', () => {
     })
   })
 
-  it('hermes-config returns config-unavailable metadata when gateway probing fails', async () => {
+  it('hermes-config returns 503 degraded JSON when gateway probing fails', async () => {
     gatewayMock.ensureGatewayProbed.mockRejectedValue(new Error('gateway down'))
 
     const response = await hermesConfigHandlers.GET({
       request: authedRequest('http://localhost/api/hermes-config'),
     })
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(503)
     const body = (await response.json()) as {
-      code: string
-      capability: string
-      disconnected: boolean
-      gatewayReachable: boolean
+      ok: boolean
+      reason: string
       gatewayError: string
-      config: Record<string, unknown>
-      providers: Array<unknown>
     }
     expect(body).toMatchObject({
       ok: false,
-      code: 'capability_unavailable',
-      capability: 'config',
-      disconnected: true,
-      gatewayReachable: false,
+      reason: 'gateway_unavailable',
       gatewayError: 'gateway down',
-      config: {},
-      providers: [],
     })
+    expect(body).not.toHaveProperty('unhandled')
   })
 })
