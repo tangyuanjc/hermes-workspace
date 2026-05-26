@@ -200,8 +200,7 @@ async function probe(path: string): Promise<boolean> {
       headers: authHeaders(),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
-    if (res.status === 404 || res.status === 403) return false
-    return true
+    return res.ok
   } catch {
     return false
   }
@@ -217,8 +216,7 @@ async function probeChatCompletions(): Promise<boolean> {
     if (getRes.status === 405) return true
     if (getRes.ok) return true
     if (getRes.status === 400 || getRes.status === 422) return true
-    if (getRes.status === 404) return false
-    return true
+    return false
   } catch {
     return false
   }
