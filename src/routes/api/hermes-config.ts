@@ -11,6 +11,7 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import {
   ensureGatewayProbed,
   getCapabilities,
+  type GatewayCapabilities,
 } from '../../server/gateway-capabilities'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
@@ -174,22 +175,59 @@ function checkAuthStore(providerId: string): {
   return { hasToken: false, source: '' }
 }
 
+function getGatewayErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'gateway probe failed'
+}
+
+function isGatewayReachable(capabilities: GatewayCapabilities): boolean {
+  return (
+    capabilities.health ||
+    capabilities.chatCompletions ||
+    capabilities.dashboard.available
+  )
+}
+
+async function readConfigCapabilityState(): Promise<{
+  capabilities: GatewayCapabilities
+  gatewayError?: string
+}> {
+  try {
+    return { capabilities: await ensureGatewayProbed() }
+  } catch (error) {
+    return {
+      capabilities: getCapabilities(),
+      gatewayError: getGatewayErrorMessage(error),
+    }
+  }
+}
+
+function createConfigUnavailableBody(
+  state: { capabilities: GatewayCapabilities; gatewayError?: string },
+  extra?: Record<string, unknown>,
+) {
+  const gatewayReachable = isGatewayReachable(state.capabilities)
+  return {
+    ...createCapabilityUnavailablePayload('config', extra),
+    config: {},
+    providers: [],
+    activeProvider: '',
+    activeModel: '',
+    hermesHome: HERMES_HOME,
+    disconnected: !gatewayReachable,
+    gatewayReachable,
+    gatewayError: state.gatewayError,
+  }
+}
+
 export const Route = createFileRoute('/api/hermes-config')({
   server: {
     handlers: {
       GET: async ({ request }) => {
         const authResult = isAuthenticated(request) as AuthResult
         if (authResult !== true) return authResult
-        await ensureGatewayProbed()
-        if (!getCapabilities().config) {
-          return Response.json({
-            ...createCapabilityUnavailablePayload('config'),
-            config: {},
-            providers: [],
-            activeProvider: '',
-            activeModel: '',
-            hermesHome: HERMES_HOME,
-          })
+        const gatewayState = await readConfigCapabilityState()
+        if (!gatewayState.capabilities.config) {
+          return Response.json(createConfigUnavailableBody(gatewayState))
         }
 
         const config = readConfig()
@@ -249,11 +287,11 @@ export const Route = createFileRoute('/api/hermes-config')({
       PATCH: async ({ request }) => {
         const authResult = isAuthenticated(request) as AuthResult
         if (authResult !== true) return authResult
-        await ensureGatewayProbed()
-        if (!getCapabilities().config) {
+        const gatewayState = await readConfigCapabilityState()
+        if (!gatewayState.capabilities.config) {
           return new Response(
             JSON.stringify(
-              createCapabilityUnavailablePayload('config', {
+              createConfigUnavailableBody(gatewayState, {
                 error: 'Configuration updates are unavailable on this backend.',
               }),
             ),

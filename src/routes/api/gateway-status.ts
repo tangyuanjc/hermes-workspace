@@ -23,13 +23,19 @@ export const Route = createFileRoute('/api/gateway-status')({
         } catch {
           capabilities = getCapabilities()
         }
+        const mode = getGatewayMode()
+        const gatewayAvailable =
+          capabilities.health || capabilities.chatCompletions
         return json({
           capabilities,
-          mode: getGatewayMode(),
+          mode,
+          disconnected: mode === 'disconnected',
+          gatewayReachable:
+            gatewayAvailable || capabilities.dashboard.available,
           hermesUrl: HERMES_API,
           dashboardUrl: HERMES_DASHBOARD_URL,
           gateway: {
-            available: capabilities.health || capabilities.chatCompletions,
+            available: gatewayAvailable,
             url: HERMES_API,
           },
           dashboard: capabilities.dashboard,

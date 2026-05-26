@@ -46,6 +46,8 @@ type ConnectionStatus = {
   status: 'connected' | 'enhanced' | 'partial' | 'disconnected'
   label: 'Connected' | 'Enhanced' | 'Partial' | 'Disconnected'
   detail: string
+  disconnected: boolean
+  gatewayReachable: boolean
   health: boolean
   chatReady: boolean
   modelConfigured: boolean
@@ -113,6 +115,9 @@ export const Route = createFileRoute('/api/connection-status')({
           status,
           label,
           detail,
+          disconnected: status === 'disconnected',
+          gatewayReachable:
+            caps.health || caps.chatCompletions || caps.dashboard.available,
           health: caps.health,
           chatReady,
           modelConfigured,

@@ -39,6 +39,7 @@ vi.mock('./gateway-capabilities', () => ({
 
 import { Route as ConnectionStatusRoute } from '../routes/api/connection-status'
 import { Route as GatewayStatusRoute } from '../routes/api/gateway-status'
+import { Route as HermesConfigRoute } from '../routes/api/hermes-config'
 
 const connectionStatusHandlers = ConnectionStatusRoute.options.server
   ?.handlers as unknown as {
@@ -46,6 +47,11 @@ const connectionStatusHandlers = ConnectionStatusRoute.options.server
 }
 
 const gatewayStatusHandlers = GatewayStatusRoute.options.server
+  ?.handlers as unknown as {
+  GET: (ctx: { request: Request }) => Promise<Response>
+}
+
+const hermesConfigHandlers = HermesConfigRoute.options.server
   ?.handlers as unknown as {
   GET: (ctx: { request: Request }) => Promise<Response>
 }
@@ -150,6 +156,8 @@ describe('gateway status endpoints without Hermes Gateway', () => {
     }
     expect(body).toMatchObject({
       status: 'disconnected',
+      disconnected: true,
+      gatewayReachable: false,
       chatReady: false,
     })
   })
@@ -169,8 +177,38 @@ describe('gateway status endpoints without Hermes Gateway', () => {
     }
     expect(body).toMatchObject({
       mode: 'disconnected',
+      disconnected: true,
       gateway: { available: false },
       dashboard: { available: false },
+    })
+  })
+
+  it('hermes-config returns config-unavailable metadata when gateway probing fails', async () => {
+    gatewayMock.ensureGatewayProbed.mockRejectedValue(new Error('gateway down'))
+
+    const response = await hermesConfigHandlers.GET({
+      request: authedRequest('http://localhost/api/hermes-config'),
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      code: string
+      capability: string
+      disconnected: boolean
+      gatewayReachable: boolean
+      gatewayError: string
+      config: Record<string, unknown>
+      providers: Array<unknown>
+    }
+    expect(body).toMatchObject({
+      ok: false,
+      code: 'capability_unavailable',
+      capability: 'config',
+      disconnected: true,
+      gatewayReachable: false,
+      gatewayError: 'gateway down',
+      config: {},
+      providers: [],
     })
   })
 })
