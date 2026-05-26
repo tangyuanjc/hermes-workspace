@@ -64,11 +64,11 @@ function passwordRequest(password: string) {
 }
 
 describe('password auth route local sessions', () => {
-  it('creates a local sqlite session without calling Hermes Gateway', async () => {
+  it('creates a local sqlite session even when Hermes Gateway calls throw', async () => {
     const dbPath = setupTempDbPath()
     process.env.NODE_ENV = 'production'
     process.env.PASSWORD_JC = 'secret-abc'
-    const fetchMock = vi.fn()
+    const fetchMock = vi.fn().mockRejectedValue(new Error('gateway down'))
     vi.stubGlobal('fetch', fetchMock)
 
     const response = await passwordAuthHandlers.POST({
