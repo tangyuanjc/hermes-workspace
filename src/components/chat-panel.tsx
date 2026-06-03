@@ -25,7 +25,21 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
-export function ChatPanel() {
+type ChatPanelProps = {
+  isAuthenticated?: boolean
+}
+
+export function shouldLoadChatPanelSessions({
+  isAuthenticated,
+  isOpen,
+}: {
+  isAuthenticated: boolean
+  isOpen: boolean
+}): boolean {
+  return isAuthenticated && isOpen
+}
+
+export function ChatPanel({ isAuthenticated = true }: ChatPanelProps) {
   const isOpen = useWorkspaceStore((s) => s.chatPanelOpen)
   const sessionKey = useWorkspaceStore((s) => s.chatPanelSessionKey)
   const setChatPanelOpen = useWorkspaceStore((s) => s.setChatPanelOpen)
@@ -61,6 +75,7 @@ export function ChatPanel() {
           : []
     },
     staleTime: 10_000,
+    enabled: shouldLoadChatPanelSessions({ isAuthenticated, isOpen }),
   })
   const sessions: Array<SessionMeta> = sessionsQuery.data ?? []
 
@@ -125,7 +140,7 @@ export function ChatPanel() {
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      {shouldLoadChatPanelSessions({ isAuthenticated, isOpen }) && (
         <>
           {/* Backdrop for narrow screens */}
           <motion.div

@@ -1,12 +1,13 @@
 import { HeadContent, Scripts, createRootRoute, useRouterState } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import appCss from '../styles.css?url'
-import { SearchModal } from '@/components/search/search-modal'
+import type { AuthStatus } from '@/lib/hermes-auth'
 import { TerminalShortcutListener } from '@/components/terminal-shortcut-listener'
 import { GlobalShortcutListener } from '@/components/global-shortcut-listener'
 import {
   WorkspaceShell,
+  isFullscreenExperienceRoute,
   shouldSuppressWorkspaceOverlays,
 } from '@/components/workspace-shell'
 import { MobilePromptTrigger } from '@/components/mobile-prompt/MobilePromptTrigger'
@@ -15,6 +16,13 @@ import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { initializeSettingsAppearance } from '@/hooks/use-settings'
 import { HermesOnboarding } from '@/components/onboarding/hermes-onboarding'
+import { useSearchModal } from '@/hooks/use-search-modal'
+
+const SearchModal = lazy(() =>
+  import('@/components/search/search-modal').then((module) => ({
+    default: module.SearchModal,
+  })),
+)
 
 const APP_CSP = [
   "default-src 'self'",
@@ -116,7 +124,7 @@ ${script}
 
 export async function unregisterServiceWorkers(args: {
   serviceWorker?: {
-    getRegistrations?: () => Promise<Array<{ unregister: () => unknown }>>
+    getRegistrations?: () => Promise<ReadonlyArray<{ unregister: () => unknown }>>
   }
   cachesApi?: {
     keys?: () => Promise<string[]>
@@ -152,6 +160,28 @@ export async function unregisterServiceWorkers(args: {
   } catch {
     // swallow caches enumeration failures
   }
+}
+
+export function shouldRenderSearchModal({
+  isOpen,
+  fullscreenExperience,
+}: {
+  isOpen: boolean
+  fullscreenExperience: boolean
+}): boolean {
+  return isOpen && !fullscreenExperience
+}
+
+export function shouldEnableSearchData({
+  authStatus,
+  fullscreenExperience,
+}: {
+  authStatus: AuthStatus | null
+  fullscreenExperience: boolean
+}): boolean {
+  if (fullscreenExperience) return false
+  if (!authStatus) return false
+  return authStatus.authenticated || !authStatus.authRequired
 }
 
 export const Route = createRootRoute({
@@ -254,11 +284,22 @@ function RootLayout() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+  const isSearchOpen = useSearchModal((state) => state.isOpen)
   // Suppress workspace-shell onboarding/tour overlays on routes that render
   // their own full-screen experience (dashboard landing, ai-hotboard). The
   // react-joyride overlay was silently intercepting clicks on the ai-hotboard
   // left-rail for first-time visitors — hence "nav 点不动" for new users.
   const suppressFirstOpenOverlays = shouldSuppressWorkspaceOverlays(pathname)
+  const fullscreenExperience = isFullscreenExperienceRoute(pathname)
+  const renderSearchModal = shouldRenderSearchModal({
+    isOpen: isSearchOpen,
+    fullscreenExperience,
+  })
+  const searchDataEnabled = shouldEnableSearchData({
+    authStatus,
+    fullscreenExperience,
+  })
 
   // Unregister any existing service workers — they cause stale asset issues
   // after Docker image updates and behind reverse proxies (Pangolin, Cloudflare, etc.)
@@ -280,8 +321,12 @@ function RootLayout() {
       <TerminalShortcutListener />
       {suppressFirstOpenOverlays ? null : <MobilePromptTrigger />}
       <Toaster />
-      <WorkspaceShell />
-      <SearchModal />
+      <WorkspaceShell onAuthStatusChange={setAuthStatus} />
+      {renderSearchModal ? (
+        <Suspense fallback={null}>
+          <SearchModal dataEnabled={searchDataEnabled} />
+        </Suspense>
+      ) : null}
       {suppressFirstOpenOverlays ? null : <OnboardingTour />}
       <KeyboardShortcutsModal />
     </QueryClientProvider>

@@ -59,7 +59,11 @@ function getFileBadge(ext: string) {
   return ext.toUpperCase()
 }
 
-export function SearchModal() {
+type SearchModalProps = {
+  dataEnabled?: boolean
+}
+
+export function SearchModal({ dataEnabled = true }: SearchModalProps) {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -77,7 +81,10 @@ export function SearchModal() {
   const deferredQuery = useDeferredValue(debouncedQuery)
 
   // Real data (Phase 3.2)
-  const { sessions, files, skills } = useSearchData(scope)
+  const { sessions, files, skills } = useSearchData(
+    scope,
+    dataEnabled && isOpen,
+  )
   const searchableFiles = useMemo(
     () => files.filter((entry) => entry.type === 'file'),
     [files],

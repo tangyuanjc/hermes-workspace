@@ -74,6 +74,10 @@ export function shouldLoadWorkspaceData({
   return authChecked && authenticated && !fullscreenExperience
 }
 
+type WorkspaceShellProps = {
+  onAuthStatusChange?: (status: AuthStatus) => void
+}
+
 async function fetchSessions(): Promise<SessionsListResponse> {
   const res = await fetch('/api/sessions')
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -85,7 +89,7 @@ async function fetchSessions(): Promise<SessionsListResponse> {
       : []
 }
 
-export function WorkspaceShell() {
+export function WorkspaceShell({ onAuthStatusChange }: WorkspaceShellProps = {}) {
   const navigate = useNavigate()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -144,7 +148,8 @@ export function WorkspaceShell() {
   const handleStartupConnected = useCallback((status: AuthStatus) => {
     setAuthStatus(status)
     setConnectionVerified(true)
-  }, [])
+    onAuthStatusChange?.(status)
+  }, [onAuthStatusChange])
 
   // Derive active session from URL
   const mobilePageTitle = (() => {
@@ -392,7 +397,9 @@ export function WorkspaceShell() {
           </main>
 
           {/* Chat panel — visible on non-chat routes, except fullscreen experiences with their own auth */}
-          {!isOnChatRoute && !isMobile && !isOnFullscreenExperience && <ChatPanel />}
+          {!isOnChatRoute && !isMobile && !isOnFullscreenExperience && (
+            <ChatPanel isAuthenticated={loadWorkspaceData} />
+          )}
         </div>
 
         {/* Floating chat toggle — visible on non-chat routes, except fullscreen experiences with their own auth */}

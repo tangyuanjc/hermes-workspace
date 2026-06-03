@@ -36,6 +36,13 @@ export function useGlobalShortcuts() {
 
       const mod = event.metaKey || event.ctrlKey
 
+      // Cmd/Ctrl+K — Global search
+      if (mod && event.key.toLowerCase() === 'k' && !event.shiftKey) {
+        event.preventDefault()
+        openModal()
+        return
+      }
+
       // Cmd/Ctrl+P — Quick open file
       if (mod && event.key.toLowerCase() === 'p' && !event.shiftKey) {
         event.preventDefault()
