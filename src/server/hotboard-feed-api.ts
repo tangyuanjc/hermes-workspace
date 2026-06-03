@@ -198,7 +198,8 @@ function inferMediaImageUrl(tweet: XTweet) {
     const record = entry as Record<string, unknown>
     const type = typeof record.type === 'string' ? record.type.toLowerCase() : ''
     if (type && type !== 'photo' && !type.includes('image')) continue
-    const url = readStringField(record, ['media_url_https', 'media_url', 'url'])
+    // Do not fall back to record.url: X emits /status/<id>/photo/N permalinks, not CDN image URLs.
+    const url = readStringField(record, ['media_url_https', 'media_url'])
     if (url?.startsWith('https://')) return url
   }
 

@@ -309,6 +309,80 @@ describe('hotboard feed api handlers', () => {
     expect(payload.events[0]?.source_line).toBe('@builder · Builder Name')
   })
 
+  it('does not infer x.com photo permalinks as image urls', async () => {
+    createTempFeedFile({
+      bookmarks: [
+        {
+          id: 'tweet-photo-permalink',
+          author: 'foo',
+          name: 'Foo',
+          text: 'Production scraper emits x.com photo permalinks here',
+          likes: 7,
+          retweets: 2,
+          views: 150,
+          replies: 0,
+          created_at: 'Wed Apr 16 09:35:02 +0000 2026',
+          url: 'https://x.com/foo/status/123',
+          media: [
+            {
+              type: 'photo',
+              url: 'https://x.com/foo/status/123/photo/1',
+            },
+          ],
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    expect(response.status).toBe(200)
+
+    const payload = (await response.json()) as {
+      events: Array<{ image_url?: string }>
+    }
+
+    expect(payload.events[0]?.image_url).toBeUndefined()
+  })
+
+  it('keeps x media CDN URLs as image urls', async () => {
+    createTempFeedFile({
+      bookmarks: [
+        {
+          id: 'tweet-cdn-photo',
+          author: 'foo',
+          name: 'Foo',
+          text: 'Real CDN image URL should survive feed mapping',
+          likes: 7,
+          retweets: 2,
+          views: 150,
+          replies: 0,
+          created_at: 'Wed Apr 16 09:35:02 +0000 2026',
+          url: 'https://x.com/foo/status/124',
+          media: [
+            {
+              type: 'photo',
+              media_url_https: 'https://pbs.twimg.com/media/abc?format=jpg',
+            },
+          ],
+        },
+      ],
+      likes: [],
+      following: [],
+      for_you: [],
+    })
+
+    const response = await handleHotboardFeedGet(makeRequest('http://localhost/api/hotboard/feed?source=x-bookmarks'))
+    expect(response.status).toBe(200)
+
+    const payload = (await response.json()) as {
+      events: Array<{ image_url?: string }>
+    }
+
+    expect(payload.events[0]?.image_url).toBe('https://pbs.twimg.com/media/abc?format=jpg')
+  })
+
   it('returns merged timeline for source=all sorted by created_at desc', async () => {
     createTempFeedFile({
       bookmarks: [
